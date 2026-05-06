@@ -228,6 +228,6 @@ Lingxi is designed for daily companionship and emotional support. It is not a me
 - Included reproducible scripts for dataset construction, training, evaluation, and ablation experiments.
 - Reserved extension points for robot speech, expression, and motion control.
 
-## 许可证
+## License
 
-本仓库中作者自有代码和文档采用 MIT License 开源；第三方数据集、模型权重和外部依赖遵循其原始许可证。
+Original code and documentation in this repository are licensed under the MIT License. Third-party datasets, model weights, and external dependencies remain subject to their original licenses.
