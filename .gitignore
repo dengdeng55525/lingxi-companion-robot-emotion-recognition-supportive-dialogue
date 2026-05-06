@@ -1,0 +1,21 @@
+# Runtime/private local artifacts
+.codex/
+data/memory/memory.json
+webapp/logs/
+outputs/**/runs/
+outputs/**/checkpoint-*/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+
+# Base model is downloaded by scripts/download_assets.py
+models/

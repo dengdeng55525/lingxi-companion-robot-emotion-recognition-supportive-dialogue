@@ -1,0 +1,6 @@
+extends: configs/qwen25_1p5b_qlora.yaml
+lora:
+  r: 16
+  alpha: 32
+training:
+  output_dir: outputs/lingxi-qwen25-1p5b-lora-r16

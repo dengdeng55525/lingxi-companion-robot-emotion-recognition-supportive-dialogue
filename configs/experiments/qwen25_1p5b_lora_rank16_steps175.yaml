@@ -1,0 +1,9 @@
+extends: configs/experiments/qwen25_1p5b_lora_base.yaml
+
+lora:
+  r: 16
+  alpha: 32
+
+training:
+  output_dir: outputs/experiments/rank16_steps175
+  optim: adamw_torch

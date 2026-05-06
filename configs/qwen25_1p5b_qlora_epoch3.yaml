@@ -1,0 +1,4 @@
+extends: configs/qwen25_1p5b_qlora.yaml
+training:
+  output_dir: outputs/lingxi-qwen25-1p5b-lora-epoch3
+  num_train_epochs: 3

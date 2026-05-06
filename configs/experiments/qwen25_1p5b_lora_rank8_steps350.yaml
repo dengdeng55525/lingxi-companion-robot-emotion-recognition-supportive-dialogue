@@ -1,0 +1,7 @@
+extends: configs/experiments/qwen25_1p5b_lora_base.yaml
+
+training:
+  output_dir: outputs/experiments/rank8_steps350
+  max_steps: 350
+  num_train_epochs: 2
+  save_steps: 50

@@ -1,0 +1,4 @@
+extends: configs/experiments/qwen25_1p5b_lora_base.yaml
+
+training:
+  output_dir: outputs/lingxi-qwen25-1p5b-lora-30min
