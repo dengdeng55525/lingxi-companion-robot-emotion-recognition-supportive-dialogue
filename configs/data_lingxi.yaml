@@ -1,0 +1,18 @@
+seed: 42
+
+paths:
+  soulchat_dir: data/raw/soulchat
+  psyqa_dir: data/raw/psyqa_repo
+  train_file: data/processed/lingxi_train.jsonl
+  valid_file: data/processed/lingxi_valid.jsonl
+  test_file: data/processed/lingxi_test.jsonl
+  sample_file: examples/lingxi_sample.jsonl
+
+sampling:
+  soulchat_max_samples: 3000
+  psyqa_max_samples: 300
+  valid_ratio: 0.05
+  test_ratio: 0.05
+
+format:
+  include_system_prompt: true

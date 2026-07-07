@@ -1,13 +1,21 @@
-__pycache__/
-*.py[cod]
+# Runtime/private local artifacts
+.codex/
+data/memory/memory.json
+webapp/logs/
+logs/
+outputs/**/runs/
+outputs/**/checkpoint-*/
+.ros/
 *.log
 *.pid
 *.tmp
 
-# Runtime output
-logs/
-outputs/
-.ros/
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # ROS build output
 build/
@@ -15,7 +23,15 @@ devel/
 install/
 .catkin_tools/
 
-# Model weights and large artifacts
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+
+# Base model is downloaded by scripts/download_assets.py
+models/
+
+# Model weights and large local artifacts
 *.pt
 *.pth
 *.onnx
@@ -31,4 +47,3 @@ install/
 known_hosts
 id_rsa*
 id_ed25519*
-

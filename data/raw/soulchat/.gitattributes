@@ -1,0 +1,2 @@
+# Intentionally left valid so Git does not treat this dataset metadata file
+# as malformed attributes during normal repository operations.

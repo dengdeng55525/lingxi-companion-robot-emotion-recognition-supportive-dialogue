@@ -1,0 +1,8 @@
+extends: configs/experiments/qwen25_1p5b_lora_base.yaml
+
+lora:
+  r: 4
+  alpha: 8
+
+training:
+  output_dir: outputs/experiments/rank4_steps175

@@ -1,0 +1,7 @@
+extends: configs/experiments/qwen25_1p5b_lora_rank16_steps175.yaml
+
+lora:
+  use_rslora: true
+
+training:
+  output_dir: outputs/experiments/rank16_steps175_rslora

@@ -1,0 +1,59 @@
+seed: 42
+
+model:
+  base_model: models/Qwen2.5-1.5B-Instruct
+  trust_remote_code: true
+  torch_dtype: auto
+  load_in_4bit: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_compute_dtype: bfloat16
+  bnb_4bit_use_double_quant: true
+
+data:
+  train_file: data/processed/lingxi_train.jsonl
+  valid_file: data/processed/lingxi_valid.jsonl
+  max_seq_length: 1536
+  pretokenize: true
+
+lora:
+  r: 8
+  alpha: 16
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+training:
+  output_dir: outputs/experiments/rank8_steps175
+  max_steps: 175
+  max_train_samples: 2790
+  max_eval_samples: 155
+  num_train_epochs: 1
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 8
+  gradient_accumulation_steps: 2
+  learning_rate: 0.0002
+  warmup_ratio: 0.03
+  weight_decay: 0.0
+  logging_steps: 10
+  eval_steps: 50
+  save_steps: 50
+  save_total_limit: 1
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs:
+    use_reentrant: false
+  optim: paged_adamw_8bit
+  lr_scheduler_type: cosine
+  dataloader_num_workers: 0
+  dataloader_pin_memory: true
+  dataloader_persistent_workers: false
+  dataloader_prefetch_factor:
+  torch_empty_cache_steps: 10
+  eval_accumulation_steps: 8
+  report_to:
+    - tensorboard

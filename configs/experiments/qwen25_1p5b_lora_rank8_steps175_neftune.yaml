@@ -1,0 +1,5 @@
+extends: configs/experiments/qwen25_1p5b_lora_base.yaml
+
+training:
+  output_dir: outputs/experiments/rank8_steps175_neftune
+  neftune_noise_alpha: 5

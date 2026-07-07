@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>灵犀控制台</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body data-active-view="chat">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">LX</div>
+          <div>
+            <h1>灵犀</h1>
+            <p>LoRA 情绪支持助手</p>
+          </div>
+        </div>
+        <nav class="nav" aria-label="主导航">
+          <button class="nav-item active" data-view="chat"><span class="icon">＋</span><span>陪伴对话</span></button>
+          <button class="nav-item" data-view="dashboard"><span class="icon">⌂</span><span>总览</span></button>
+          <button class="nav-item" data-view="experiments"><span class="icon">▣</span><span>实验训练</span></button>
+          <button class="nav-item" data-view="reports"><span class="icon">▤</span><span>报告中心</span></button>
+          <button class="nav-item" data-view="data"><span class="icon">▥</span><span>数据配置</span></button>
+          <button class="nav-item" data-view="jobs"><span class="icon">▦</span><span>任务日志</span></button>
+        </nav>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Qwen2.5-1.5B-Instruct · QLoRA · DPO</p>
+            <h2 id="view-title">陪伴对话</h2>
+          </div>
+          <div class="top-actions">
+            <span id="server-time" class="status-pill">--</span>
+            <button id="refresh-btn" class="button secondary"><span class="icon">↻</span><span>刷新</span></button>
+          </div>
+        </header>
+
+        <section id="dashboard" class="view">
+          <div class="grid overview-grid">
+            <article class="panel metric-panel">
+              <div class="panel-head">
+                <h3>资源状态</h3>
+                <button class="icon-button" data-job="check_env" title="运行环境检查">▶</button>
+              </div>
+              <div id="gpu-list" class="gpu-list"></div>
+            </article>
+
+            <article class="panel metric-panel">
+              <div class="panel-head">
+                <h3>数据集</h3>
+                <button class="icon-button" data-job="prepare_dataset" title="重建数据集">▶</button>
+              </div>
+              <div id="dataset-counters" class="counter-grid"></div>
+            </article>
+
+            <article class="panel metric-panel">
+              <div class="panel-head">
+                <h3>训练产物</h3>
+                <button class="icon-button" data-view-jump="experiments" title="查看实验">›</button>
+              </div>
+              <div id="artifact-counters" class="counter-grid"></div>
+            </article>
+          </div>
+
+          <div class="grid split-grid">
+            <article class="panel">
+              <div class="panel-head">
+                <h3>训练流程</h3>
+                <span class="subtle">SFT → 消融 → DPO → 报告</span>
+              </div>
+              <canvas id="pipeline-canvas" width="900" height="260" aria-label="训练流程图"></canvas>
+            </article>
+            <article class="panel">
+              <div class="panel-head">
+                <h3>关键指标</h3>
+                <span class="subtle">Eval loss / PPL</span>
+              </div>
+              <div id="metric-bars" class="metric-bars"></div>
+            </article>
+          </div>
+
+          <article class="panel">
+            <div class="panel-head">
+              <h3>实验矩阵</h3>
+              <span id="experiment-count" class="subtle"></span>
+            </div>
+            <div class="table-wrap">
+              <table id="experiment-table"></table>
+            </div>
+          </article>
+        </section>
+
+        <section id="chat" class="view active">
+          <div class="chatgpt-shell">
+            <aside class="chat-side panel">
+              <div class="panel-head">
+                <h3>会话设置</h3>
+                <button id="reset-memory" class="icon-button danger" title="清空记忆">×</button>
+              </div>
+              <div class="chat-settings">
+                <label class="field compact">
+                  <span>场景</span>
+                  <input id="chat-scene" value="家庭陪伴" />
+                </label>
+                <label class="field compact">
+                  <span>情绪</span>
+                  <select id="chat-emotion">
+                    <option value="">自动识别</option>
+                    <option>平静</option>
+                    <option>焦虑</option>
+                    <option>悲伤</option>
+                    <option>孤独</option>
+                    <option>愤怒</option>
+                    <option>疲惫</option>
+                    <option>开心</option>
+                    <option>危机</option>
+                  </select>
+                </label>
+                <label class="field compact">
+                  <span>Adapter</span>
+                  <select id="chat-adapter"></select>
+                </label>
+                <label class="field compact">
+                  <span>记忆窗口</span>
+                  <input id="chat-window" type="number" min="1" max="10" value="3" />
+                </label>
+                <div class="switch-stack">
+                  <label><input id="chat-no-save" type="checkbox" />不写入记忆</label>
+                  <label><input id="chat-disable-safety" type="checkbox" />关闭安全拦截</label>
+                </div>
+              </div>
+
+              <div class="memory-visual">
+                <div class="memory-visual-head">
+                  <h4>记忆图谱</h4>
+                  <span id="memory-count" class="subtle"></span>
+                </div>
+                <canvas id="memory-canvas" width="340" height="220" aria-label="情绪记忆图"></canvas>
+              </div>
+
+              <div class="memory-summary">
+                <h4>最近记忆</h4>
+                <div id="memory-timeline" class="timeline compact-timeline"></div>
+              </div>
+            </aside>
+
+            <article class="chat-main panel">
+              <div class="chat-header">
+                <div>
+                  <h3>灵犀陪伴对话</h3>
+                </div>
+                <div class="chat-header-actions">
+                  <button id="new-chat" class="button secondary"><span class="icon">＋</span><span>新对话</span></button>
+                  <button id="show-prompt" class="button secondary"><span class="icon">▧</span><span>查看 Prompt</span></button>
+                </div>
+              </div>
+
+              <div id="safety-box" class="safety-box chat-safety"></div>
+              <div id="chat-thread" class="chat-thread" aria-live="polite"></div>
+
+              <div class="chat-bottom">
+                <div class="prompt-drawer" id="prompt-drawer" hidden>
+                  <div class="prompt-drawer-head">
+                    <h4>当前 Prompt</h4>
+                    <button id="close-prompt" class="icon-button" title="关闭">×</button>
+                  </div>
+                  <pre id="chat-prompt"></pre>
+                </div>
+
+                <div id="manual-panel" class="manual-panel" hidden>
+                  <label class="field compact">
+                    <span>手动回复内容</span>
+                    <textarea id="manual-reply" rows="3">听起来你现在压力很大。我们可以先把任务拆成最小的一步，先完成最容易开始的那一项。</textarea>
+                  </label>
+                  <button class="button secondary" data-chat-mode="manual"><span class="icon">＋</span><span>写入手动回复</span></button>
+                </div>
+
+                <form id="chat-form" class="chat-composer">
+                  <textarea id="chat-user" rows="1" placeholder="输入你想说的话，Enter 发送，Shift+Enter 换行"></textarea>
+                  <div class="composer-tools">
+                    <button type="button" class="button secondary" id="manual-toggle"><span class="icon">✎</span><span>手动</span></button>
+                    <button type="submit" class="button primary"><span class="icon">▶</span><span>发送</span></button>
+                  </div>
+                </form>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section id="experiments" class="view">
+          <article class="panel">
+            <div class="panel-head">
+              <h3>任务入口</h3>
+              <span class="subtle">所有训练默认使用项目配置</span>
+            </div>
+            <div id="command-grid" class="command-grid"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <h3>Adapter 与指标</h3>
+              <button class="icon-button" data-job="evaluate_domain" title="重新评测">▶</button>
+            </div>
+            <div class="table-wrap">
+              <table id="metrics-table"></table>
+            </div>
+          </article>
+        </section>
+
+        <section id="reports" class="view">
+          <div class="grid reports-grid">
+            <article class="panel report-list-panel">
+              <div class="panel-head">
+                <h3>报告</h3>
+                <button class="icon-button" data-job="summarize_experiments" title="汇总报告">▶</button>
+              </div>
+              <div id="report-list" class="report-list"></div>
+            </article>
+            <article class="panel report-viewer-panel">
+              <div class="panel-head">
+                <h3 id="report-title">报告内容</h3>
+                <span id="report-path" class="subtle"></span>
+              </div>
+              <div id="report-viewer" class="markdown"></div>
+            </article>
+          </div>
+        </section>
+
+        <section id="data" class="view">
+          <div class="grid data-grid">
+            <article class="panel">
+              <div class="panel-head">
+                <h3>文件状态</h3>
+                <button class="icon-button" data-job="download_assets_dry" title="下载预检">▶</button>
+              </div>
+              <div id="data-files" class="file-grid"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-head">
+                <h3>配置查看</h3>
+                <select id="config-select"></select>
+              </div>
+              <pre id="config-viewer" class="code-view"></pre>
+            </article>
+          </div>
+          <article class="panel">
+            <div class="panel-head">
+              <h3>样本预览</h3>
+              <select id="sample-select">
+                <option value="examples/eval_prompts.jsonl">评测提示词</option>
+                <option value="examples/lingxi_sample.jsonl">SFT 样例</option>
+                <option value="examples/dpo_sample.jsonl">DPO 样例</option>
+                <option value="data/processed/lingxi_train.jsonl">训练集</option>
+                <option value="data/processed/dpo_train.jsonl">DPO 训练集</option>
+              </select>
+            </div>
+            <pre id="sample-viewer" class="code-view"></pre>
+          </article>
+        </section>
+
+        <section id="jobs" class="view">
+          <div class="grid jobs-grid">
+            <article class="panel">
+              <div class="panel-head">
+                <h3>任务列表</h3>
+                <button id="refresh-jobs" class="icon-button" title="刷新任务">↻</button>
+              </div>
+              <div id="job-list" class="job-list"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-head">
+                <h3>日志</h3>
+                <span id="job-log-title" class="subtle"></span>
+              </div>
+              <pre id="job-log" class="log-view"></pre>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
