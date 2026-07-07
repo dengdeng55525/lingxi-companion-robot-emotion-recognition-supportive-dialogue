@@ -1,0 +1,34 @@
+__pycache__/
+*.py[cod]
+*.log
+*.pid
+*.tmp
+
+# Runtime output
+logs/
+outputs/
+.ros/
+
+# ROS build output
+build/
+devel/
+install/
+.catkin_tools/
+
+# Model weights and large artifacts
+*.pt
+*.pth
+*.onnx
+*.engine
+*.whl
+*.zip
+*.tar
+*.tar.gz
+
+# Local secrets/config
+.env
+*.private.*
+known_hosts
+id_rsa*
+id_ed25519*
+

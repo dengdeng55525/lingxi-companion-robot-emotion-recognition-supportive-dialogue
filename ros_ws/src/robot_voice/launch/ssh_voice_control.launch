@@ -1,0 +1,46 @@
+<launch>
+    <arg name="jetson_user" default="clbrobot"/>
+    <arg name="jetson_host" default="192.168.64.91"/>
+    <arg name="input_topic" default="iat_text"/>
+    <arg name="linear_speed" default="0.15"/>
+    <arg name="angular_speed" default="0.45"/>
+    <arg name="command_duration" default="3.0"/>
+    <arg name="default_turn_degrees" default="90.0"/>
+    <arg name="max_command_duration" default="30.0"/>
+    <arg name="obstacle_avoid_enabled" default="false"/>
+    <arg name="scan_topic" default="/scan"/>
+    <arg name="obstacle_distance" default="0.55"/>
+    <arg name="clear_distance" default="0.70"/>
+    <arg name="front_sector_degrees" default="25.0"/>
+    <arg name="side_sector_start_degrees" default="35.0"/>
+    <arg name="side_sector_end_degrees" default="85.0"/>
+    <arg name="avoid_turn_speed" default="0.45"/>
+    <arg name="avoid_turn_step_seconds" default="0.45"/>
+    <arg name="avoid_pause_seconds" default="0.15"/>
+    <arg name="scan_timeout" default="1.0"/>
+
+    <node pkg="robot_voice"
+          type="ssh_voice_control.py"
+          name="ssh_voice_control"
+          output="screen">
+        <param name="jetson_user" value="$(arg jetson_user)"/>
+        <param name="jetson_host" value="$(arg jetson_host)"/>
+        <param name="input_topic" value="$(arg input_topic)"/>
+        <param name="linear_speed" value="$(arg linear_speed)"/>
+        <param name="angular_speed" value="$(arg angular_speed)"/>
+        <param name="command_duration" value="$(arg command_duration)"/>
+        <param name="default_turn_degrees" value="$(arg default_turn_degrees)"/>
+        <param name="max_command_duration" value="$(arg max_command_duration)"/>
+        <param name="obstacle_avoid_enabled" value="$(arg obstacle_avoid_enabled)"/>
+        <param name="scan_topic" value="$(arg scan_topic)"/>
+        <param name="obstacle_distance" value="$(arg obstacle_distance)"/>
+        <param name="clear_distance" value="$(arg clear_distance)"/>
+        <param name="front_sector_degrees" value="$(arg front_sector_degrees)"/>
+        <param name="side_sector_start_degrees" value="$(arg side_sector_start_degrees)"/>
+        <param name="side_sector_end_degrees" value="$(arg side_sector_end_degrees)"/>
+        <param name="avoid_turn_speed" value="$(arg avoid_turn_speed)"/>
+        <param name="avoid_turn_step_seconds" value="$(arg avoid_turn_step_seconds)"/>
+        <param name="avoid_pause_seconds" value="$(arg avoid_pause_seconds)"/>
+        <param name="scan_timeout" value="$(arg scan_timeout)"/>
+    </node>
+</launch>

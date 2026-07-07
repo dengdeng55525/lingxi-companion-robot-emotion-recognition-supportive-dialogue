@@ -1,0 +1,28 @@
+<launch>
+    <arg name="model_path" default="$(env HOME)/models/vosk-model-small-cn-0.22"/>
+    <arg name="sample_rate" default="16000"/>
+    <arg name="device_name" default=""/>
+    <arg name="cmd_vel_topic" default="/cmd_vel"/>
+    <arg name="linear_speed" default="0.10"/>
+    <arg name="angular_speed" default="0.50"/>
+    <arg name="use_vosk" default="true"/>
+
+    <node if="$(arg use_vosk)"
+          pkg="robot_voice"
+          type="vosk_iat_publish.py"
+          name="iat_publish"
+          output="screen">
+        <param name="model_path" value="$(arg model_path)"/>
+        <param name="sample_rate" value="$(arg sample_rate)"/>
+        <param name="device_name" value="$(arg device_name)"/>
+    </node>
+
+    <node pkg="robot_voice"
+          type="voice_control"
+          name="car_control"
+          output="screen">
+        <param name="linear_speed" value="$(arg linear_speed)"/>
+        <param name="angular_speed" value="$(arg angular_speed)"/>
+        <remap from="cmd_vel" to="$(arg cmd_vel_topic)"/>
+    </node>
+</launch>

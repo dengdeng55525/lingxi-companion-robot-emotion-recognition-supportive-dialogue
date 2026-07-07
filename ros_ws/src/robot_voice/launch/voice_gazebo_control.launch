@@ -1,0 +1,24 @@
+<launch>
+    <arg name="paused" default="false"/>
+    <arg name="use_sim_time" default="true"/>
+    <arg name="gui" default="true"/>
+    <arg name="headless" default="false"/>
+    <arg name="debug" default="false"/>
+
+    <include file="$(find gazebo_ros)/launch/empty_world.launch">
+        <arg name="paused" value="$(arg paused)"/>
+        <arg name="use_sim_time" value="$(arg use_sim_time)"/>
+        <arg name="gui" value="$(arg gui)"/>
+        <arg name="headless" value="$(arg headless)"/>
+        <arg name="debug" value="$(arg debug)"/>
+    </include>
+
+    <node pkg="gazebo_ros"
+          type="spawn_model"
+          name="spawn_voice_car"
+          args="-sdf -file $(find robot_voice)/models/voice_car/model.sdf -model voice_car"
+          output="screen"/>
+
+    <node pkg="robot_voice" type="voice_control" name="car_control" output="screen"/>
+    <node pkg="robot_voice" type="tts_subscribe" name="tts_subscribe" output="screen"/>
+</launch>

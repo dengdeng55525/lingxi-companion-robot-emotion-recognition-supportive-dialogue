@@ -1,0 +1,26 @@
+<launch>
+    <arg name="base_type" default="NanoRobot"/>
+    <arg name="open_rviz" default="false"/>
+
+    <param name="/use_sim_time" value="true"/>
+
+    <node pkg="stage_ros"
+          type="stageros"
+          name="stageros"
+          args="$(find robot_simulation)/stage/$(arg base_type)/empty.world"
+          output="screen">
+        <param name="base_watchdog_timeout" value="0.5"/>
+        <remap from="base_scan" to="scan"/>
+        <remap from="odom" to="odom"/>
+    </node>
+
+    <node pkg="robot_voice" type="iat_publish" name="iat_publish" output="screen"/>
+    <node pkg="robot_voice" type="voice_control" name="car_control" output="screen"/>
+    <node pkg="robot_voice" type="tts_subscribe" name="tts_subscribe" output="screen"/>
+
+    <node if="$(arg open_rviz)"
+          pkg="rviz"
+          type="rviz"
+          name="rviz"
+          output="screen"/>
+</launch>

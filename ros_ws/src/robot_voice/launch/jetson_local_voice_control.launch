@@ -1,0 +1,25 @@
+<launch>
+    <arg name="start_bringup" default="true"/>
+    <arg name="model_path" default="$(env HOME)/models/vosk-model-small-cn-0.22"/>
+    <arg name="sample_rate" default="16000"/>
+    <arg name="device_name" default=""/>
+    <arg name="cmd_vel_topic" default="/cmd_vel"/>
+    <arg name="linear_speed" default="0.15"/>
+    <arg name="angular_speed" default="0.45"/>
+    <arg name="duration" default="3.0"/>
+
+    <include if="$(arg start_bringup)"
+             file="$(find clbrobot)/launch/bringup.launch"/>
+
+    <node pkg="robot_voice"
+          type="jetson_local_voice_cmd.py"
+          name="jetson_local_voice_cmd"
+          output="screen"
+          args="--model-path $(arg model_path)
+                --sample-rate $(arg sample_rate)
+                --device-name $(arg device_name)
+                --cmd-vel-topic $(arg cmd_vel_topic)
+                --linear-speed $(arg linear_speed)
+                --angular-speed $(arg angular_speed)
+                --duration $(arg duration)"/>
+</launch>

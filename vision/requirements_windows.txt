@@ -1,0 +1,14 @@
+opencv-python
+numpy
+pillow
+pandas
+matplotlib
+seaborn
+scipy
+tqdm
+pyyaml
+requests
+thop
+emotiefflib[torch]
+fastapi
+uvicorn

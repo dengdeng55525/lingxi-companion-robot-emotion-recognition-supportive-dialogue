@@ -1,0 +1,186 @@
+<launch>
+    <arg name="jetson_user" default="clbrobot"/>
+    <arg name="jetson_host" default="192.168.64.91"/>
+
+    <arg name="api_enabled" default="true"/>
+    <arg name="model" default="$(optenv OPENAI_MODEL gpt-5.4)"/>
+    <arg name="base_url" default="$(optenv OPENAI_BASE_URL https://sub2api.luciferai.cc)"/>
+    <arg name="api_mode" default="auto"/>
+    <arg name="wake_word_required" default="true"/>
+    <arg name="wake_session_enabled" default="true"/>
+    <arg name="wake_words" default="灵犀"/>
+    <arg name="wake_word_aliases" default="林夕,凌曦,灵溪,灵息,领席,零希"/>
+
+    <arg name="linear_speed" default="0.15"/>
+    <arg name="angular_speed" default="0.45"/>
+    <arg name="command_duration" default="3.0"/>
+    <arg name="default_turn_degrees" default="90.0"/>
+    <arg name="max_command_duration" default="60.0"/>
+    <arg name="obstacle_avoid_enabled" default="false"/>
+    <arg name="scan_topic" default="/scan"/>
+    <arg name="obstacle_distance" default="0.55"/>
+    <arg name="clear_distance" default="0.70"/>
+    <arg name="front_sector_degrees" default="25.0"/>
+    <arg name="side_sector_start_degrees" default="35.0"/>
+    <arg name="side_sector_end_degrees" default="85.0"/>
+    <arg name="avoid_turn_speed" default="0.45"/>
+    <arg name="avoid_turn_step_seconds" default="0.45"/>
+    <arg name="avoid_pause_seconds" default="0.15"/>
+    <arg name="scan_timeout" default="1.0"/>
+    <arg name="max_meters" default="5.0"/>
+    <arg name="max_degrees" default="180.0"/>
+    <arg name="vision_fresh_seconds" default="3.0"/>
+    <arg name="emotion_confidence_threshold" default="0.65"/>
+    <arg name="emotion_file" default="$(env HOME)/.ros/latest_emotion.json"/>
+    <arg name="emotion_file_poll_seconds" default="0.5"/>
+    <arg name="startup_emotion_greeting_enabled" default="true"/>
+    <arg name="startup_emotion_greeting_min_delay" default="2.0"/>
+    <arg name="startup_emotion_greeting_timeout" default="20.0"/>
+    <arg name="startup_emotion_greeting_min_confidence" default="0.55"/>
+    <arg name="startup_emotion_greeting_min_face_count" default="1"/>
+    <arg name="startup_face_search_enabled" default="true"/>
+    <arg name="startup_face_search_min_delay" default="2.0"/>
+    <arg name="startup_face_search_turn_degrees" default="45.0"/>
+    <arg name="startup_face_search_after_turn_wait" default="2.0"/>
+    <arg name="startup_face_search_max_turns" default="8"/>
+    <arg name="proactive_face_search_enabled" default="false"/>
+    <arg name="proactive_face_search_no_face_seconds" default="10.0"/>
+    <arg name="proactive_face_search_turn_degrees" default="45.0"/>
+    <arg name="proactive_face_search_step_wait" default="0.2"/>
+
+    <arg name="enable_jetson_mic" default="true"/>
+    <arg name="vosk_model_path" default="$(env HOME)/vosk-model-small-cn-0.22"/>
+    <arg name="jetson_audio_input_device" default=""/>
+    <arg name="audio_sample_rate" default="16000"/>
+
+    <arg name="enable_reply_speaker" default="true"/>
+    <arg name="jetson_audio_output_device" default=""/>
+    <arg name="tts_backend" default="auto"/>
+    <arg name="tts_voice" default="zh"/>
+
+    <arg name="enable_music_player" default="true"/>
+    <arg name="music_dir" default="$(env HOME)/Music/robot_music"/>
+    <arg name="announce_before_play" default="false"/>
+    <arg name="announce_after_stop" default="false"/>
+
+    <arg name="plan_file" default="$(env HOME)/.ros/ai_companion_latest_plan.json"/>
+    <arg name="dance_profile_file" default="$(env HOME)/.ros/ai_dance_profile.json"/>
+    <arg name="memory_file" default="$(env HOME)/.ros/ai_companion_memory.json"/>
+    <arg name="global_stop_topic" default="robot_stop_all"/>
+
+    <node if="$(arg enable_jetson_mic)"
+          pkg="robot_voice"
+          type="ssh_arecord_vosk_iat.py"
+          name="ssh_arecord_vosk_iat"
+          output="screen">
+        <param name="jetson_user" value="$(arg jetson_user)"/>
+        <param name="jetson_host" value="$(arg jetson_host)"/>
+        <param name="audio_device" value="$(arg jetson_audio_input_device)"/>
+        <param name="model_path" value="$(arg vosk_model_path)"/>
+        <param name="sample_rate" value="$(arg audio_sample_rate)"/>
+        <param name="publish_topic" value="iat_text"/>
+        <param name="wake_word_aliases" value="$(arg wake_word_aliases)"/>
+    </node>
+
+    <node pkg="robot_voice"
+          type="ai_companion_node.py"
+          name="ai_companion_node"
+          output="screen">
+        <param name="input_topic" value="iat_text"/>
+        <param name="motion_topic" value="ai_motion_text"/>
+        <param name="plan_topic" value="ai_plan"/>
+        <param name="reply_topic" value="ai_reply"/>
+        <param name="vision_topic" value="vision_context"/>
+        <param name="model" value="$(arg model)"/>
+        <param name="base_url" value="$(arg base_url)"/>
+        <param name="api_mode" value="$(arg api_mode)"/>
+        <param name="api_enabled" value="$(arg api_enabled)"/>
+        <param name="wake_word_required" value="$(arg wake_word_required)"/>
+        <param name="wake_session_enabled" value="$(arg wake_session_enabled)"/>
+        <param name="wake_words" value="$(arg wake_words)"/>
+        <param name="linear_speed" value="$(arg linear_speed)"/>
+        <param name="angular_speed" value="$(arg angular_speed)"/>
+        <param name="max_meters" value="$(arg max_meters)"/>
+        <param name="max_degrees" value="$(arg max_degrees)"/>
+        <param name="vision_fresh_seconds" value="$(arg vision_fresh_seconds)"/>
+        <param name="emotion_confidence_threshold" value="$(arg emotion_confidence_threshold)"/>
+        <param name="emotion_file" value="$(arg emotion_file)"/>
+        <param name="emotion_file_poll_seconds" value="$(arg emotion_file_poll_seconds)"/>
+        <param name="startup_emotion_greeting_enabled" value="$(arg startup_emotion_greeting_enabled)"/>
+        <param name="startup_emotion_greeting_min_delay" value="$(arg startup_emotion_greeting_min_delay)"/>
+        <param name="startup_emotion_greeting_timeout" value="$(arg startup_emotion_greeting_timeout)"/>
+        <param name="startup_emotion_greeting_min_confidence" value="$(arg startup_emotion_greeting_min_confidence)"/>
+        <param name="startup_emotion_greeting_min_face_count" value="$(arg startup_emotion_greeting_min_face_count)"/>
+        <param name="startup_face_search_enabled" value="$(arg startup_face_search_enabled)"/>
+        <param name="startup_face_search_min_delay" value="$(arg startup_face_search_min_delay)"/>
+        <param name="startup_face_search_turn_degrees" value="$(arg startup_face_search_turn_degrees)"/>
+        <param name="startup_face_search_after_turn_wait" value="$(arg startup_face_search_after_turn_wait)"/>
+        <param name="startup_face_search_max_turns" value="$(arg startup_face_search_max_turns)"/>
+        <param name="proactive_face_search_enabled" value="$(arg proactive_face_search_enabled)"/>
+        <param name="proactive_face_search_no_face_seconds" value="$(arg proactive_face_search_no_face_seconds)"/>
+        <param name="proactive_face_search_turn_degrees" value="$(arg proactive_face_search_turn_degrees)"/>
+        <param name="proactive_face_search_step_wait" value="$(arg proactive_face_search_step_wait)"/>
+        <param name="plan_file" value="$(arg plan_file)"/>
+        <param name="dance_profile_file" value="$(arg dance_profile_file)"/>
+        <param name="memory_file" value="$(arg memory_file)"/>
+        <param name="global_stop_topic" value="$(arg global_stop_topic)"/>
+    </node>
+
+    <node pkg="robot_voice"
+          type="ssh_voice_control.py"
+          name="ssh_voice_control"
+          output="screen">
+        <param name="input_topic" value="ai_motion_text"/>
+        <param name="jetson_user" value="$(arg jetson_user)"/>
+        <param name="jetson_host" value="$(arg jetson_host)"/>
+        <param name="linear_speed" value="$(arg linear_speed)"/>
+        <param name="angular_speed" value="$(arg angular_speed)"/>
+        <param name="command_duration" value="$(arg command_duration)"/>
+        <param name="default_turn_degrees" value="$(arg default_turn_degrees)"/>
+        <param name="max_command_duration" value="$(arg max_command_duration)"/>
+        <param name="obstacle_avoid_enabled" value="$(arg obstacle_avoid_enabled)"/>
+        <param name="scan_topic" value="$(arg scan_topic)"/>
+        <param name="obstacle_distance" value="$(arg obstacle_distance)"/>
+        <param name="clear_distance" value="$(arg clear_distance)"/>
+        <param name="front_sector_degrees" value="$(arg front_sector_degrees)"/>
+        <param name="side_sector_start_degrees" value="$(arg side_sector_start_degrees)"/>
+        <param name="side_sector_end_degrees" value="$(arg side_sector_end_degrees)"/>
+        <param name="avoid_turn_speed" value="$(arg avoid_turn_speed)"/>
+        <param name="avoid_turn_step_seconds" value="$(arg avoid_turn_step_seconds)"/>
+        <param name="avoid_pause_seconds" value="$(arg avoid_pause_seconds)"/>
+        <param name="scan_timeout" value="$(arg scan_timeout)"/>
+    </node>
+
+    <node if="$(arg enable_reply_speaker)"
+          pkg="robot_voice"
+          type="ssh_reply_speaker.py"
+          name="ssh_reply_speaker"
+          output="screen">
+        <param name="reply_topic" value="ai_reply"/>
+        <param name="jetson_user" value="$(arg jetson_user)"/>
+        <param name="jetson_host" value="$(arg jetson_host)"/>
+        <param name="audio_device" value="$(arg jetson_audio_output_device)"/>
+        <param name="backend" value="$(arg tts_backend)"/>
+        <param name="voice" value="$(arg tts_voice)"/>
+        <param name="global_stop_topic" value="$(arg global_stop_topic)"/>
+    </node>
+
+    <node if="$(arg enable_music_player)"
+          pkg="robot_voice"
+          type="music_player_node.py"
+          name="music_player_node"
+          output="screen">
+        <param name="input_topic" value="iat_text"/>
+        <param name="reply_topic" value="ai_reply"/>
+        <param name="music_dir" value="$(arg music_dir)"/>
+        <param name="jetson_user" value="$(arg jetson_user)"/>
+        <param name="jetson_host" value="$(arg jetson_host)"/>
+        <param name="audio_device" value="$(arg jetson_audio_output_device)"/>
+        <param name="announce_before_play" value="$(arg announce_before_play)"/>
+        <param name="announce_after_stop" value="$(arg announce_after_stop)"/>
+        <param name="wake_word_required" value="$(arg wake_word_required)"/>
+        <param name="wake_session_enabled" value="$(arg wake_session_enabled)"/>
+        <param name="wake_words" value="$(arg wake_words)"/>
+        <param name="global_stop_topic" value="$(arg global_stop_topic)"/>
+    </node>
+</launch>

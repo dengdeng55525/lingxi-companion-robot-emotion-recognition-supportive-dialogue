@@ -1,0 +1,80 @@
+<launch>
+    <arg name="world_name" default="/opt/ros/noetic/share/turtlebot3_gazebo/worlds/turtlebot3_house.world"/>
+    <arg name="paused" default="false"/>
+    <arg name="use_sim_time" default="true"/>
+    <arg name="gui" default="true"/>
+    <arg name="headless" default="false"/>
+    <arg name="debug" default="false"/>
+
+    <arg name="model_name" default="voice_car"/>
+    <arg name="x_pos" default="-3.0"/>
+    <arg name="y_pos" default="1.0"/>
+    <arg name="z_pos" default="0.0"/>
+    <arg name="yaw" default="0.0"/>
+
+    <arg name="scan_topic" default="/scan"/>
+    <arg name="base_frame" default="base_link"/>
+    <arg name="odom_frame" default="odom"/>
+    <arg name="map_frame" default="map"/>
+
+    <arg name="open_rviz" default="true"/>
+    <arg name="rviz_config" default="$(find robot_voice)/rviz/voice_house_navigation.rviz"/>
+
+    <param name="/use_sim_time" value="$(arg use_sim_time)"/>
+
+    <include file="$(find gazebo_ros)/launch/empty_world.launch">
+        <arg name="world_name" value="$(arg world_name)"/>
+        <arg name="paused" value="$(arg paused)"/>
+        <arg name="use_sim_time" value="$(arg use_sim_time)"/>
+        <arg name="gui" value="$(arg gui)"/>
+        <arg name="headless" value="$(arg headless)"/>
+        <arg name="debug" value="$(arg debug)"/>
+    </include>
+
+    <node pkg="gazebo_ros"
+          type="spawn_model"
+          name="spawn_voice_car"
+          args="-sdf -file $(find robot_voice)/models/voice_car/model.sdf -model $(arg model_name) -x $(arg x_pos) -y $(arg y_pos) -z $(arg z_pos) -Y $(arg yaw)"
+          output="screen"/>
+
+    <!--
+      NOTE 1:
+      gmapping needs a sensor_msgs/LaserScan topic. The current voice_car model.sdf only contains
+      the planar movement plugin (cmd_vel/odom), so you must verify that the model really publishes
+      LaserScan on $(arg scan_topic). If it does not, add a Gazebo laser/ray sensor to model.sdf first.
+
+      NOTE 2:
+      gmapping also needs a valid TF from the scan frame to $(arg base_frame). If your laser frame is
+      not base_link, make sure that TF exists before expecting /map to build correctly.
+    -->
+    <node pkg="gmapping"
+          type="slam_gmapping"
+          name="slam_gmapping"
+          output="screen">
+        <param name="base_frame" value="$(arg base_frame)"/>
+        <param name="odom_frame" value="$(arg odom_frame)"/>
+        <param name="map_frame" value="$(arg map_frame)"/>
+        <param name="map_update_interval" value="2.0"/>
+        <param name="maxUrange" value="8.0"/>
+        <param name="linearUpdate" value="0.2"/>
+        <param name="angularUpdate" value="0.2"/>
+        <param name="temporalUpdate" value="1.0"/>
+        <param name="delta" value="0.05"/>
+        <remap from="scan" to="$(arg scan_topic)"/>
+    </node>
+
+    <node pkg="robot_voice" type="voice_control" name="car_control" output="screen"/>
+    <node pkg="robot_voice" type="tts_subscribe" name="tts_subscribe" output="screen"/>
+
+    <!--
+      iat_publish is intentionally not launched here because it waits for interactive keyboard input
+      (space/enter) from a dedicated terminal. Start it manually in a second terminal.
+    -->
+
+    <node if="$(arg open_rviz)"
+          pkg="rviz"
+          type="rviz"
+          name="rviz"
+          args="-d $(arg rviz_config)"
+          output="screen"/>
+</launch>
