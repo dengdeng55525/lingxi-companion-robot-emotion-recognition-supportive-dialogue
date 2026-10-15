@@ -57,6 +57,258 @@ Camera frames (Jetson ROS)
 This GitHub backup intentionally does not contain real SSH passwords, API keys, or stream tokens. Keep values such as `ROBOTVISION_STREAM_TOKEN`, `OPENAI_API_KEY`, and SeetaCloud/AutoDL SSH credentials in local private notes or environment variables.
 
 
+## Robot Deployment (整机部署与使用)
+
+### Hardware / Topology
+
+```text
+┌──────────────────────────────┐
+│  Jetson (robot body) 192.168.210.91 │
+│  - ASTRA camera + chassis (/cmd_vel) │
+│  - RoboEyes expression driver        │
+└───────────────┬──────────────┘
+                │ ROS network / SSH
+┌───────────────▼──────────────┐
+│  VM (main controller)          │
+│  - web_video_server :8080      │
+│  - vision upload + JSON        │
+│  - vision_result_api :8090     │
+│  - parent_dashboard_api :8091  │
+│  - static frontend :9000       │
+│  - ROS voice/AI/motion         │
+│  - emotion sync to Jetson      │
+└───────────────┬──────────────┘
+                │ SSH tunnel :6008
+┌───────────────▼──────────────┐
+│  AutoDL/SeetaCloud            │
+│  - emotion + object inference │
+│  - /api/frame, /api/latest-result │
+└──────────────────────────────┘
+```
+
+### Key Environment Variables
+
+| Variable | Purpose |
+| --- | --- |
+| `ROBOTVISION_STREAM_TOKEN` | AutoDL vision stream token |
+| `DEEPSEEK_BASE_URL` / `DEEPSEEK_MODEL` / `DEEPSEEK_API_KEY` | LLM backend (`~/.ros/lingxi_ai_env.sh`) |
+| `ROS_MASTER_URI` | ROS master (Jetson: `http://192.168.210.91:11311`, VM local: `http://localhost:11311`) |
+
+### Step 1 – Jetson (Terminal 1 & 2)
+
+Start chassis bringup and camera:
+
+```bash
+ssh clbrobot@192.168.210.91
+source /opt/ros/melodic/setup.bash
+source ~/catkin_ws/devel/setup.bash
+export ROS_MASTER_URI=http://192.168.210.91:11311
+export ROS_IP=192.168.210.91
+export ROS_HOSTNAME=192.168.210.91
+roslaunch clbrobot bringup.launch          # Terminal 1
+roslaunch clbrobot astra_laser.launch      # Terminal 2
+```
+
+Verify camera topic:
+
+```bash
+rostopic hz /camera/rgb/image_raw
+```
+
+### Step 2 – VM Video Stream (Terminal 3)
+
+```bash
+source /opt/ros/noetic/setup.bash
+source ~/catkin_ws/devel/setup.bash
+export ROS_MASTER_URI=http://192.168.210.91:11311
+export VM_IP=192.168.210.231
+export ROS_IP=$VM_IP
+export ROS_HOSTNAME=$VM_IP
+rosrun web_video_server web_video_server _port:=8080
+```
+
+Browser check: `http://127.0.0.1:8080/stream?topic=/camera/rgb/image_raw`
+
+### Step 3 – AutoDL SSH Tunnel (Terminal 4, must keep running)
+
+```bash
+ssh -N -L 6008:127.0.0.1:6008 -p 39265 root@connect.westc.seetacloud.com
+```
+
+Verify:
+
+```bash
+curl --noproxy '*' http://127.0.0.1:6008/api/latest-result -H "X-Stream-Token: 11111111"
+```
+
+### Step 4 – VM Vision Upload + Result (Terminal 5)
+
+```bash
+cd ~/yolov5_emotieff_vgaf_windows
+export ROBOTVISION_STREAM_TOKEN=11111111
+
+python3 send_webcam_http.py \
+  --server-url http://127.0.0.1:6008 \
+  --token "$ROBOTVISION_STREAM_TOKEN" \
+  --camera-url "http://127.0.0.1:8080/stream?topic=/camera/rgb/image_raw" \
+  --width 0 --height 0 \
+  --upload-fps 5 --jpeg-quality 78 \
+  --result-hz 0.5 \
+  --json-output outputs/latest_emotion.json \
+  --latest-emotion-output "$HOME/.ros/latest_emotion.json" \
+  --reconnect-interval 2.0
+```
+
+Check JSON updates:
+
+```bash
+watch -n 0.5 cat ~/.ros/latest_emotion.json
+```
+
+### Step 5 – VM Vision API (Terminal 6)
+
+```bash
+cd ~/yolov5_emotieff_vgaf_windows
+python3 -u vision_result_api.py \
+  --json-path outputs/latest_emotion.json \
+  --host 0.0.0.0 --port 8090
+```
+
+### Step 6 – VM Frontend Static Server (Terminal 7)
+
+```bash
+cd ~/yolov5_emotieff_vgaf_windows/frontend
+python3 -m http.server 9000
+```
+
+Pages:
+
+- Vision dashboard: `http://127.0.0.1:9000/vision_dashboard.html`
+- Parent dashboard: `http://127.0.0.1:9000/parent_dashboard.html`
+
+### Step 7 – VM Parent Dashboard API (Terminal 7A, optional but recommended)
+
+```bash
+cd ~/yolov5_emotieff_vgaf_windows
+python3 parent_dashboard_api.py \
+  --vision-url http://127.0.0.1:8090/vision/latest \
+  --db outputs/parent_dashboard.sqlite3 \
+  --dialogue-log "$HOME/.ros/ai_companion_dialogue.jsonl" \
+  --learning-log "$HOME/.ros/ai_learning_events.jsonl" \
+  --host 0.0.0.0 --port 8091 \
+  --sample-interval 2.0
+```
+
+### Step 8 – VM ROScore + AI Companion Launch (Terminal 8)
+
+First start roscore (if not already running):
+
+```bash
+cd ~/catkin_ws
+source devel/setup.bash
+unset ROS_IP ROS_HOSTNAME
+export ROS_MASTER_URI=http://localhost:11311
+roscore
+```
+
+Then start the AI companion dialogue stack:
+
+```bash
+cd ~/catkin_ws
+source devel/setup.bash
+source ~/.ros/lingxi_ai_env.sh
+unset ROS_IP ROS_HOSTNAME
+export ROS_MASTER_URI=http://localhost:11311
+
+roslaunch robot_voice ai_companion_dialogue.launch \
+  jetson_user:=clbrobot \
+  jetson_host:=192.168.210.91 \
+  model:=$DEEPSEEK_MODEL \
+  base_url:=$DEEPSEEK_BASE_URL \
+  enable_jetson_mic:=false \
+  enable_reply_speaker:=true \
+  enable_music_player:=true \
+  api_enabled:=true \
+  api_mode:=chat_completions \
+  tts_backend:=local-edge-tts \
+  jetson_audio_output_device:=pulse \
+  music_dir:=$HOME/Music/robot_music \
+  wake_word_required:=true \
+  wake_session_enabled:=true \
+  wake_words:=灵犀 \
+  emotion_file:=$HOME/.ros/latest_emotion.json \
+  emotion_file_poll_seconds:=0.5 \
+  dangerous_object_alert_enabled:=true \
+  dangerous_object_alert_interval:=20.0 \
+  dangerous_object_min_confidence:=0.30
+```
+
+### Step 9 – VM Voice Input (Terminal 9)
+
+```bash
+cd ~/catkin_ws
+source devel/setup.bash
+unset ROS_IP ROS_HOSTNAME
+export ROS_MASTER_URI=http://localhost:11311
+roslaunch robot_voice iat_publish.launch
+```
+
+### Step 10 – Parent Dialogue Logger (Terminal 9A, recommended)
+
+```bash
+cd ~/catkin_ws
+source devel/setup.bash
+unset ROS_IP ROS_HOSTNAME
+export ROS_MASTER_URI=http://localhost:11311
+cd ~/yolov5_emotieff_vgaf_windows
+python3 parent_dialogue_logger.py \
+  --user-topic /iat_text \
+  --assistant-topic /ai_reply \
+  --log-file "$HOME/.ros/ai_companion_dialogue.jsonl"
+```
+
+### Step 11 – VM -> Jetson Emotion Sync (Terminal 10, RoboEyes)
+
+```bash
+python3 ~/桌面/sync_emotion_to_jetson.py
+# or: bash ~/桌面/start_vm_emotion_sync.sh
+```
+
+### Step 12 – Usage
+
+After the full stack is running:
+
+1. Speak the wake word: `灵犀`
+2. Issue a command, e.g. `灵犀，这是什么？` / `灵犀，前进 0.5 米` / `灵犀，左转 90 度`
+3. Observe RoboEyes expression changes (happy/sad/angry/neutral)
+4. Open parent dashboard: `http://127.0.0.1:9000/parent_dashboard.html`
+5. Review emotion history, dialogue timeline, learning concepts, and dangerous-object alerts
+
+### One-Click Alternative
+
+For quick demos (less debug-friendly), the pre-made scripts in `desktop_tools/` start the whole stack:
+
+```bash
+bash ~/桌面/start_jetson_all.sh          # Jetson chassis + camera
+bash ~/桌面/start_vm_vision_all.sh       # VM video + vision + dashboards
+bash ~/桌面/start_vm_voice_all.sh        # VM voice input/output
+bash ~/桌面/start_vm_emotion_sync.sh     # RoboEyes emotion sync
+```
+
+### Troubleshooting Quick Reference
+
+See `docs/ROBOEYES_启动与排障手册.md` for the complete manual. Common checks:
+
+| Symptom | Check |
+| --- | --- |
+| HTML has no video | `web_video_server` running? `/camera/rgb/image_raw` exists? |
+| AutoDL result empty | SSH tunnel alive? `curl .../api/latest-result -H "X-Stream-Token: 11111111"` |
+| AI API failed | `source ~/.ros/lingxi_ai_env.sh` valid? DeepSeek key works? |
+| Robot does not move | `/cmd_vel` exists? `ssh clbrobot@192.168.210.91 'echo ssh_ok'`? |
+| RoboEyes not changing | `sync_emotion_to_jetson.py` running? `latest_emotion_vm.json` updating on Jetson? |
+| Parent dashboard empty | `parent_dashboard_api.py` on `:8091`? `/vision/latest` on `:8090` returning real data? |
+
+
 ## Competition Positioning
 
 陪伴机器人不能只完成普通问答，还需要理解用户情绪、记住近期状态，并在用户处于压力、焦虑或低落时给出更合适的回应。灵犀围绕这一需求构建了一个可接入机器人本体的情绪支持模块。
