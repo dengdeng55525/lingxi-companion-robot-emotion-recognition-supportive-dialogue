@@ -2,16 +2,16 @@
 set -eo pipefail
 
 JETSON_USER="${JETSON_USER:-clbrobot}"
-JETSON_HOST="${JETSON_HOST:-192.168.64.91}"
+JETSON_HOST="${JETSON_HOST:-192.168.210.91}"
 
 ssh "${JETSON_USER}@${JETSON_HOST}" 'bash -s' <<'REMOTE'
 set -eo pipefail
 
 source /opt/ros/melodic/setup.bash
 source ~/catkin_ws/devel/setup.bash
-export ROS_MASTER_URI=http://192.168.64.91:11311
-export ROS_IP=192.168.64.91
-export ROS_HOSTNAME=192.168.64.91
+export ROS_MASTER_URI=http://192.168.210.91:11311
+export ROS_IP=192.168.210.91
+export ROS_HOSTNAME=192.168.210.91
 
 start_bg() {
   local name="$1"
@@ -41,7 +41,7 @@ ensure_roscore() {
 
 ensure_bringup() {
   if ! pgrep -f "[r]oslaunch clbrobot bringup.launch" >/dev/null 2>&1; then
-    start_bg "bringup" "source /opt/ros/melodic/setup.bash; source ~/catkin_ws/devel/setup.bash; export ROS_MASTER_URI=http://192.168.64.91:11311; export ROS_IP=192.168.64.91; export ROS_HOSTNAME=192.168.64.91; roslaunch clbrobot bringup.launch" "$HOME/bringup.log"
+    start_bg "bringup" "source /opt/ros/melodic/setup.bash; source ~/catkin_ws/devel/setup.bash; export ROS_MASTER_URI=http://192.168.210.91:11311; export ROS_IP=192.168.210.91; export ROS_HOSTNAME=192.168.210.91; roslaunch clbrobot bringup.launch" "$HOME/bringup.log"
   else
     echo "[INFO] already running: bringup"
   fi

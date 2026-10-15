@@ -5,7 +5,7 @@
 根据你提供的环境信息，当前状态是：
 
 - 虚拟机：Ubuntu 20.04.6 LTS，Python 3.8.10，8 vCPU，7.7 GiB RAM。
-- ROS 链路：小车 IP `192.168.79.91`，虚拟机 IP `192.168.79.199`，图像话题 `/camera/rgb/image_raw` 已可通过 `rqt_image_view` 查看。
+- ROS 链路：小车 IP `192.168.210.91`，虚拟机 IP `192.168.210.231`，图像话题 `/camera/rgb/image_raw` 已可通过 `rqt_image_view` 查看。
 - 推理依赖：`torch 1.13.1+cu117`、`torchvision 0.14.1+cu117`、`cv2 4.13.0`、`numpy 1.24.4`。
 - GPU 状态：`nvidia-smi` 不存在，`torch.cuda.is_available()` 为 `False`。也就是说当前虚拟机还不能使用 NVIDIA GPU。
 
@@ -32,9 +32,9 @@ PY
 
 ```bash
 source /opt/ros/noetic/setup.bash
-export ROS_MASTER_URI=http://192.168.79.91:11311
-export ROS_IP=192.168.79.199
-export ROS_HOSTNAME=192.168.79.199
+export ROS_MASTER_URI=http://192.168.210.91:11311
+export ROS_IP=192.168.210.231
+export ROS_HOSTNAME=192.168.210.231
 
 python3 scripts/check_env_linux.py
 ```
@@ -57,16 +57,16 @@ python3 -m pip install -r requirements_linux.txt
 小车端先启动 ASTRA：
 
 ```bash
-ROS_MASTER_URI=http://192.168.79.91:11311 ROS_IP=192.168.79.91 ROS_HOSTNAME=192.168.79.91 roslaunch clbrobot astra_laser.launch
+ROS_MASTER_URI=http://192.168.210.91:11311 ROS_IP=192.168.210.91 ROS_HOSTNAME=192.168.210.91 roslaunch clbrobot astra_laser.launch
 ```
 
 虚拟机端确认图像频率：
 
 ```bash
 source /opt/ros/noetic/setup.bash
-export ROS_MASTER_URI=http://192.168.79.91:11311
-export ROS_IP=192.168.79.199
-export ROS_HOSTNAME=192.168.79.199
+export ROS_MASTER_URI=http://192.168.210.91:11311
+export ROS_IP=192.168.210.231
+export ROS_HOSTNAME=192.168.210.231
 
 rostopic hz /camera/rgb/image_raw
 ```
@@ -79,9 +79,9 @@ rostopic hz /camera/rgb/image_raw
 
 ```bash
 source /opt/ros/noetic/setup.bash
-export ROS_MASTER_URI=http://192.168.79.91:11311
-export ROS_IP=192.168.79.199
-export ROS_HOSTNAME=192.168.79.199
+export ROS_MASTER_URI=http://192.168.210.91:11311
+export ROS_IP=192.168.210.231
+export ROS_HOSTNAME=192.168.210.231
 
 python3 vm_ros_emotion_to_json.py \
   --ros-image-topic /camera/rgb/image_raw \
@@ -101,7 +101,7 @@ python3 vm_ros_emotion_to_json.py \
 在项目目录中运行：
 
 ```bash
-ROBOT_IP=192.168.79.91 VM_IP=192.168.79.199 bash scripts/start_vm_ros_vision_stack.sh
+ROBOT_IP=192.168.210.91 VM_IP=192.168.210.231 bash scripts/start_vm_ros_vision_stack.sh
 ```
 
 启动后会运行：
@@ -144,7 +144,7 @@ http://127.0.0.1:8080/stream?topic=/camera/rgb/image_raw
 
 ```bash
 python3 stream_emotion_to_json.py \
-  --source "http://192.168.79.91:8080/stream?topic=/camera/rgb/image_raw" \
+  --source "http://192.168.210.91:8080/stream?topic=/camera/rgb/image_raw" \
   --opencv-backend ffmpeg \
   --ffmpeg-low-latency \
   --device auto \
@@ -155,7 +155,7 @@ RTSP 示例：
 
 ```bash
 python3 stream_emotion_to_json.py \
-  --source "rtsp://192.168.79.91:8554/live" \
+  --source "rtsp://192.168.210.91:8554/live" \
   --opencv-backend ffmpeg \
   --ffmpeg-low-latency \
   --rtsp-transport tcp \

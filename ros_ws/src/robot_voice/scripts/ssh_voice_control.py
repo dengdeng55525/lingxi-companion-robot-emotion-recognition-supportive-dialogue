@@ -38,7 +38,7 @@ CHINESE_UNITS = {
 class SshVoiceControl:
     def __init__(self):
         self.jetson_user = rospy.get_param("~jetson_user", "clbrobot")
-        self.jetson_host = rospy.get_param("~jetson_host", "192.168.64.91")
+        self.jetson_host = rospy.get_param("~jetson_host", "192.168.210.91")
         self.remote_ros_setup = rospy.get_param(
             "~remote_ros_setup",
             "source /opt/ros/melodic/setup.bash && source ~/catkin_ws/devel/setup.bash",

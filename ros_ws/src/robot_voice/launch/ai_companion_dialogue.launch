@@ -1,6 +1,6 @@
 <launch>
     <arg name="jetson_user" default="clbrobot"/>
-    <arg name="jetson_host" default="192.168.64.91"/>
+    <arg name="jetson_host" default="192.168.210.91"/>
 
     <arg name="api_enabled" default="true"/>
     <arg name="model" default="$(optenv OPENAI_MODEL gpt-5.4)"/>
@@ -30,6 +30,9 @@
     <arg name="max_meters" default="5.0"/>
     <arg name="max_degrees" default="180.0"/>
     <arg name="vision_fresh_seconds" default="3.0"/>
+    <arg name="dangerous_object_alert_enabled" default="true"/>
+    <arg name="dangerous_object_alert_interval" default="20.0"/>
+    <arg name="dangerous_object_min_confidence" default="0.30"/>
     <arg name="emotion_confidence_threshold" default="0.65"/>
     <arg name="emotion_file" default="$(env HOME)/.ros/latest_emotion.json"/>
     <arg name="emotion_file_poll_seconds" default="0.5"/>
@@ -103,6 +106,9 @@
         <param name="max_meters" value="$(arg max_meters)"/>
         <param name="max_degrees" value="$(arg max_degrees)"/>
         <param name="vision_fresh_seconds" value="$(arg vision_fresh_seconds)"/>
+        <param name="dangerous_object_alert_enabled" value="$(arg dangerous_object_alert_enabled)"/>
+        <param name="dangerous_object_alert_interval" value="$(arg dangerous_object_alert_interval)"/>
+        <param name="dangerous_object_min_confidence" value="$(arg dangerous_object_min_confidence)"/>
         <param name="emotion_confidence_threshold" value="$(arg emotion_confidence_threshold)"/>
         <param name="emotion_file" value="$(arg emotion_file)"/>
         <param name="emotion_file_poll_seconds" value="$(arg emotion_file_poll_seconds)"/>

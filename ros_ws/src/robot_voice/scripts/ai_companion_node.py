@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import hashlib
 import json
 import math
 import os
@@ -6,6 +7,7 @@ import re
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections import deque
 
@@ -33,9 +35,43 @@ CHINESE_UNITS = {
     "千": 1000,
 }
 
+DANGEROUS_OBJECT_DISPLAY_NAMES = {
+    "knife": "刀具",
+    "scissors": "剪刀",
+    "fork": "叉子",
+    "baseball bat": "球棒",
+    "hammer": "锤子",
+    "cutter": "美工刀",
+    "blade": "刀片",
+    "saw": "锯子",
+    "axe": "斧头",
+    "gun": "枪形物品",
+    "pistol": "枪形物品",
+    "刀": "刀具",
+    "刀具": "刀具",
+    "菜刀": "菜刀",
+    "剪刀": "剪刀",
+    "锤子": "锤子",
+}
+
+DANGEROUS_OBJECT_KEYWORDS = (
+    ("knife", "刀具"),
+    ("scissors", "剪刀"),
+    ("fork", "叉子"),
+    ("baseball bat", "球棒"),
+    ("cutter", "美工刀"),
+    ("blade", "刀片"),
+    ("hammer", "锤子"),
+    ("saw", "锯子"),
+    ("axe", "斧头"),
+    ("刀", "刀具"),
+    ("剪刀", "剪刀"),
+    ("锤", "锤子"),
+)
+
 
 SYSTEM_PROMPT = """\
-你是一个陪伴型机器人小车的安全决策模块。
+你是一个面向儿童的早教陪护机器人，也是小车的安全决策模块。
 你会收到用户语音文字、可选视觉摘要、机器人状态。你的任务是理解用户意图和情绪，
 并输出严格 JSON。不要输出 Markdown，不要输出解释文本。
 
@@ -55,7 +91,12 @@ SYSTEM_PROMPT = """\
 6. 不要输出任何不在白名单内的动作。
 7. 如果用户只是聊天、问候、表达情绪或提出不需要移动的问题，reply 正常回答，actions 输出空数组 []。
 8. 如果上下文 memory 中有用户或机器人的长期记忆，回答时优先使用这些记忆。
-9. 如果用户询问眼前是什么、看到了什么物品，并且视觉摘要里有 objects 列表，根据 objects 中 class 和 confidence 简短回答；不要说只能识别人脸情绪。无法确定时说明不确定。
+9. 如果用户询问眼前是什么、看到了什么物品，或表达“这是什么/我想知道这个”等求知欲，并且视觉摘要里有 objects 列表，根据 objects 中 class 和 confidence 简短回答；不要说只能识别人脸情绪。此类问题 intent 必须输出 "object_learning_query"。无法确定时说明不确定。
+10. 早教/学习类问题中，如果用户的说法有明显事实错误，要先温和纠正，再回答。不要迎合错误前提。
+    例：用户说“杜甫的静夜思”，reply 必须先说明“《静夜思》是李白写的，不是杜甫”，然后再背诵或继续回答。
+11. reply 面向小孩说话，像耐心的早教老师：短句、温和、鼓励、清楚。不要用冷冰冰的工程口吻；纠错时先保护孩子积极性。
+12. 多步动作要严格保持用户给出的先后顺序。单个动作参数不能超过白名单范围；如果用户给的距离或角度超过单步范围，优先拆成多个安全动作，不要丢掉剩余意图。
+    例：前进10米可拆为 forward 5米 + forward 5米；左转300度可拆为 turn 180度 + turn 120度，然后再执行后续动作。
 
 JSON 格式：
 {
@@ -81,12 +122,16 @@ class AiCompanionNode:
         self.vision_topic = rospy.get_param("~vision_topic", "vision_context")
         self.global_stop_topic = rospy.get_param("~global_stop_topic", "robot_stop_all")
 
-        self.model = rospy.get_param("~model", os.environ.get("OPENAI_MODEL", "gpt-5.4"))
+        self.model = rospy.get_param(
+            "~model",
+            os.environ.get("DEEPSEEK_MODEL", os.environ.get("OPENAI_MODEL", "deepseek-v4-flash")),
+        )
         self.base_url = rospy.get_param(
             "~base_url",
-            os.environ.get("OPENAI_BASE_URL", "https://sub2api.luciferai.cc"),
+            os.environ.get("DEEPSEEK_BASE_URL", os.environ.get("OPENAI_BASE_URL", "https://api.deepseek.com")),
         ).rstrip("/")
-        self.api_key_env = rospy.get_param("~api_key_env", "OPENAI_API_KEY")
+        default_api_key_env = "DEEPSEEK_API_KEY" if os.environ.get("DEEPSEEK_API_KEY") else "OPENAI_API_KEY"
+        self.api_key_env = rospy.get_param("~api_key_env", default_api_key_env)
         self.request_timeout = float(rospy.get_param("~request_timeout", 30.0))
         self.api_enabled = bool(rospy.get_param("~api_enabled", True))
         self.api_mode = rospy.get_param("~api_mode", os.environ.get("AI_API_MODE", "auto")).strip().lower()
@@ -163,6 +208,18 @@ class AiCompanionNode:
         self.plan_file = os.path.expanduser(
             rospy.get_param("~plan_file", "~/.ros/ai_companion_latest_plan.json")
         )
+        self.learning_event_file = os.path.expanduser(
+            rospy.get_param("~learning_event_file", "~/.ros/ai_learning_events.jsonl")
+        )
+        self.dangerous_object_alert_enabled = bool(
+            rospy.get_param("~dangerous_object_alert_enabled", True)
+        )
+        self.dangerous_object_alert_interval = float(
+            rospy.get_param("~dangerous_object_alert_interval", 20.0)
+        )
+        self.dangerous_object_min_confidence = float(
+            rospy.get_param("~dangerous_object_min_confidence", 0.30)
+        )
         self.dance_profile_file = os.path.expanduser(
             rospy.get_param("~dance_profile_file", "~/.ros/ai_dance_profile.json")
         )
@@ -174,6 +231,7 @@ class AiCompanionNode:
 
         self._latest_vision = {}
         self._latest_vision_time = 0.0
+        self._dangerous_object_last_alert_at = {}
         self._startup_time = time.time()
         self._startup_greeting_done = False
         self._startup_face_search_started = False
@@ -190,6 +248,7 @@ class AiCompanionNode:
         self._startup_face_search_lock = threading.Lock()
         self._proactive_face_search_lock = threading.Lock()
         self._manual_face_search_lock = threading.Lock()
+        self._dangerous_object_alert_lock = threading.Lock()
         self._reply_memory = deque(maxlen=max(1, self.reply_memory_limit))
         self._dialogue_history = deque(maxlen=max(10, self.dialogue_memory_limit))
         self._recent_user_texts = deque(maxlen=max(10, self.dialogue_memory_limit))
@@ -216,12 +275,15 @@ class AiCompanionNode:
         self._proactive_face_search_thread.start()
 
         rospy.loginfo(
-            "AI companion ready: input=%s motion=%s model=%s base_url=%s",
+            "AI companion ready: input=%s motion=%s model=%s base_url=%s api_key_env=%s",
             self.input_topic,
             self.motion_topic,
             self.model,
             self.base_url,
+            self.api_key_env,
         )
+        if self._is_deepseek_base_url():
+            rospy.loginfo("DeepSeek API direct HTTPS mode enabled; environment proxy will be bypassed for model requests.")
 
     def _on_vision(self, msg):
         try:
@@ -264,6 +326,7 @@ class AiCompanionNode:
                 cue["confidence"],
             )
         self._maybe_startup_face_search()
+        self._maybe_alert_dangerous_objects()
         self._maybe_startup_emotion_greeting()
 
     def _on_user_text(self, msg):
@@ -404,6 +467,7 @@ class AiCompanionNode:
             plan = local_plan
 
         plan = self._sanitize_plan(plan)
+        plan = self._apply_educational_correction_to_plan(plan, text)
         plan = self._apply_vision_emotion_to_plan(plan)
         if (
             not plan.get("actions")
@@ -416,6 +480,7 @@ class AiCompanionNode:
             else:
                 rospy.logwarn("AI plan has no executable actions; falling back to local rule.")
                 plan = self._sanitize_plan(local_plan)
+                plan = self._apply_educational_correction_to_plan(plan, text)
                 plan = self._apply_vision_emotion_to_plan(plan)
 
         plan_json = json.dumps(plan, ensure_ascii=False)
@@ -434,6 +499,7 @@ class AiCompanionNode:
             "plan": plan,
         }
         self._write_plan_file(record)
+        self._write_learning_event_if_needed(record)
         if plan.get("intent") == "manual_face_search":
             self._start_manual_face_search(record)
             return
@@ -473,7 +539,7 @@ class AiCompanionNode:
         )
 
         try:
-            with urllib.request.urlopen(req, timeout=self.request_timeout) as resp:
+            with self._open_api_request(req) as resp:
                 response = json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", "replace")
@@ -498,7 +564,7 @@ class AiCompanionNode:
                     ],
                     "response_format": {"type": "json_object"},
                 },
-                self.base_url + "/v1/chat/completions",
+                self._chat_completions_url(),
             )
 
         return (
@@ -511,6 +577,21 @@ class AiCompanionNode:
             },
             self.base_url + "/v1/responses",
         )
+
+    def _chat_completions_url(self):
+        if self._is_deepseek_base_url():
+            return self.base_url + "/chat/completions"
+        return self.base_url + "/v1/chat/completions"
+
+    def _is_deepseek_base_url(self):
+        host = urllib.parse.urlparse(self.base_url).hostname or ""
+        return host == "api.deepseek.com" or host.endswith(".deepseek.com")
+
+    def _open_api_request(self, request):
+        if self._is_deepseek_base_url():
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            return opener.open(request, timeout=self.request_timeout)
+        return urllib.request.urlopen(request, timeout=self.request_timeout)
 
     def _extract_response_text(self, response):
         if isinstance(response.get("output_text"), str):
@@ -544,6 +625,24 @@ class AiCompanionNode:
             cleaned = cleaned[first:last + 1]
 
         return json.loads(cleaned)
+
+    def _apply_educational_correction_to_plan(self, plan, user_text):
+        normalized = self._normalize_text(user_text)
+        if "静夜思" not in normalized or "杜甫" not in normalized:
+            return plan
+
+        reply = str(plan.get("reply", "") or "").strip()
+        if "李白" in reply and ("不是杜甫" in reply or "杜甫" in reply):
+            return plan
+
+        correction = "《静夜思》是李白写的，不是杜甫。"
+        if reply:
+            plan["reply"] = self._limit_reply(correction + reply)
+        else:
+            plan["reply"] = correction + "床前明月光，疑是地上霜。举头望明月，低头思故乡。"
+        plan["intent"] = plan.get("intent") or "correct_and_recite_poem"
+        plan["actions"] = []
+        return plan
 
     def _apply_vision_emotion_to_plan(self, plan):
         cue = self._current_emotion_cue()
@@ -1158,14 +1257,16 @@ class AiCompanionNode:
 
             custom_actions = self._parse_motion_sequence(normalized)
             if custom_actions:
-                return {
+                plan = {
                     "reply": "好呀，我按你刚才说的动作跳。",
                     "emotion": "happy",
                     "intent": "custom_dance",
                     "safety": {"can_move": True, "reason": "local custom dance parsed"},
                     "actions": custom_actions,
-                    "local_priority": True,
                 }
+                if self._is_simple_local_motion_request(normalized, custom_actions):
+                    plan["local_priority"] = True
+                return plan
 
             saved_actions = self._load_dance_profile()
             if saved_actions:
@@ -1194,16 +1295,19 @@ class AiCompanionNode:
 
         actions = self._parse_motion_sequence(normalized)
         if actions:
-            return {
-                "reply": "好的，我来执行。",
+            plan = {
+                "reply": "好呀，我慢慢来。",
                 "emotion": "neutral",
                 "intent": "multi_step_motion" if len(actions) > 1 else "direct_motion",
                 "safety": {"can_move": True, "reason": "local rule parsed motion command"},
                 "actions": actions,
             }
+            if self._is_simple_local_motion_request(normalized, actions):
+                plan["local_priority"] = True
+            return plan
 
         return {
-            "reply": "我还没理解这个动作。",
+            "reply": "这个我还没听明白。你可以慢慢说，比如：前进一点点，或者左转一下。",
             "emotion": "unknown",
             "intent": "unknown",
             "safety": {"can_move": False, "reason": "no safe executable action parsed"},
@@ -1241,6 +1345,22 @@ class AiCompanionNode:
                 actions.append({"type": "stop"})
 
         return actions
+
+    def _is_simple_local_motion_request(self, normalized, actions):
+        if len(actions) != 1:
+            return False
+        if "舞" in normalized or "跳舞" in normalized:
+            return False
+        if any(word in normalized for word in ("先", "再", "然后", "接着", "最后", "顺便", "并且", "同时")):
+            return False
+
+        action = actions[0]
+        action_type = action.get("type")
+        if action_type in ("forward", "backward"):
+            return float(action.get("meters", 0.0) or 0.0) <= self.max_meters
+        if action_type == "turn":
+            return abs(float(action.get("degrees", 0.0) or 0.0)) <= self.max_degrees
+        return action_type == "stop"
 
     def _is_find_me_request(self, normalized):
         keywords = (
@@ -1652,6 +1772,158 @@ class AiCompanionNode:
         self.reply_pub.publish(String(text))
         self._reply_memory.append(text)
         self._dialogue_history.append({"role": "assistant", "text": text, "timestamp": time.time()})
+
+    def _write_learning_event_if_needed(self, record):
+        plan = record.get("plan") if isinstance(record, dict) else {}
+        if not isinstance(plan, dict) or plan.get("intent") != "object_learning_query":
+            return
+
+        objects = self._extract_learning_objects(record.get("vision"))
+        if not objects:
+            return
+
+        timestamp = float(record.get("timestamp") or time.time())
+        source_text = str(record.get("source_text") or "").strip()
+        reply = str(plan.get("reply") or "").strip()
+        event_key = "%s|%s|%s" % (
+            "%.6f" % timestamp,
+            source_text,
+            ",".join(item["class_name"] for item in objects),
+        )
+        event = {
+            "event_id": hashlib.sha1(event_key.encode("utf-8")).hexdigest(),
+            "timestamp": timestamp,
+            "iso_time": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(timestamp)),
+            "source": "ai_companion_node",
+            "intent": "object_learning_query",
+            "user_text": source_text,
+            "reply": reply,
+            "objects": objects,
+        }
+        try:
+            directory = os.path.dirname(self.learning_event_file)
+            if directory:
+                os.makedirs(directory, exist_ok=True)
+            with open(self.learning_event_file, "a", encoding="utf-8") as handle:
+                handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
+            rospy.loginfo("Recorded learning event with %d object(s).", len(objects))
+        except Exception as exc:
+            rospy.logwarn("Failed to write learning event: %s", exc)
+
+    def _extract_learning_objects(self, vision):
+        if not isinstance(vision, dict):
+            return []
+        raw_objects = vision.get("objects") or []
+        if isinstance(raw_objects, dict):
+            raw_objects = raw_objects.get("items") or []
+        if not isinstance(raw_objects, list):
+            return []
+
+        objects = []
+        seen = set()
+        for item in raw_objects:
+            if not isinstance(item, dict):
+                continue
+            class_name = str(item.get("class") or item.get("class_name") or item.get("name") or item.get("label") or "").strip()
+            if not class_name or class_name in seen:
+                continue
+            seen.add(class_name)
+            raw_confidence = item.get("confidence")
+            if raw_confidence is None:
+                raw_confidence = item.get("score")
+            try:
+                confidence = float(raw_confidence) if raw_confidence is not None else 1.0
+            except (TypeError, ValueError):
+                confidence = 0.0
+            objects.append({"class_name": class_name, "confidence": confidence})
+        return objects
+
+    def _normalize_object_name(self, value):
+        return str(value or "").strip()
+
+    def _normalize_object_key(self, value):
+        return self._normalize_object_name(value).lower().replace("_", " ")
+
+    def _dangerous_object_display_name(self, class_name):
+        key = self._normalize_object_key(class_name)
+        if not key:
+            return ""
+        if key in DANGEROUS_OBJECT_DISPLAY_NAMES:
+            return DANGEROUS_OBJECT_DISPLAY_NAMES[key]
+        for keyword, display_name in DANGEROUS_OBJECT_KEYWORDS:
+            if keyword in key:
+                return display_name
+        return ""
+
+    def _extract_dangerous_objects(self, vision):
+        if not isinstance(vision, dict):
+            return []
+        raw_objects = vision.get("objects") or []
+        if isinstance(raw_objects, dict):
+            raw_objects = raw_objects.get("items") or []
+        if not isinstance(raw_objects, list):
+            return []
+
+        dangerous = []
+        seen = set()
+        for item in raw_objects:
+            if not isinstance(item, dict):
+                continue
+            class_name = self._normalize_object_name(
+                item.get("class") or item.get("class_name") or item.get("name") or item.get("label")
+            )
+            display_name = self._dangerous_object_display_name(class_name)
+            if not class_name or not display_name:
+                continue
+            try:
+                confidence = float(item.get("confidence") or item.get("score") or 0.0)
+            except (TypeError, ValueError):
+                confidence = 0.0
+            if confidence < self.dangerous_object_min_confidence:
+                continue
+            key = self._normalize_object_key(class_name)
+            if key in seen:
+                continue
+            seen.add(key)
+            dangerous.append(
+                {
+                    "key": key,
+                    "class_name": class_name,
+                    "display_name": display_name,
+                    "confidence": confidence,
+                }
+            )
+        return dangerous
+
+    def _maybe_alert_dangerous_objects(self):
+        if not self.dangerous_object_alert_enabled:
+            return
+        dangerous = self._extract_dangerous_objects(self._latest_vision)
+        if not dangerous:
+            return
+
+        now = time.time()
+        interval = max(1.0, self.dangerous_object_alert_interval)
+        due = []
+        with self._dangerous_object_alert_lock:
+            for obj in dangerous:
+                last_alert = self._dangerous_object_last_alert_at.get(obj["key"], 0.0)
+                if now - last_alert >= interval:
+                    due.append(obj)
+                    self._dangerous_object_last_alert_at[obj["key"]] = now
+        if not due:
+            return
+
+        names = "、".join(obj["display_name"] for obj in due[:3])
+        if len(due) == 1:
+            reply = "我看到%s，这个物品很危险，请小朋友马上放下，离它远一点，请大人来帮忙。" % names
+        else:
+            reply = "我看到%s，这些物品很危险，请小朋友马上放下，离它远一点，请大人来帮忙。" % names
+        rospy.logwarn(
+            "Dangerous object detected: %s",
+            ",".join("%s:%.2f" % (obj["class_name"], obj["confidence"]) for obj in due),
+        )
+        self._publish_reply(reply)
 
     def _write_plan_file(self, record):
         if not self.plan_file:

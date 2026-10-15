@@ -9,7 +9,7 @@ def parse_args():
     p = argparse.ArgumentParser(description='Sync VM emotion JSON to Jetson for RoboEyes.')
     p.add_argument('--src', default=str(Path.home() / '.ros' / 'latest_emotion.json'))
     p.add_argument('--jetson-user', default='clbrobot')
-    p.add_argument('--jetson-host', default='192.168.64.91')
+    p.add_argument('--jetson-host', default='192.168.210.91')
     p.add_argument('--jetson-target', default='/home/clbrobot/RoboEyes/latest_emotion_vm.json')
     p.add_argument('--interval', type=float, default=0.2)
     return p.parse_args()

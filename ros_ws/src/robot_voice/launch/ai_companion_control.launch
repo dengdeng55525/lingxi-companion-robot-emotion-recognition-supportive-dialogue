@@ -1,6 +1,6 @@
 <launch>
     <arg name="jetson_user" default="clbrobot"/>
-    <arg name="jetson_host" default="192.168.64.91"/>
+    <arg name="jetson_host" default="192.168.210.91"/>
     <arg name="model" default="$(optenv OPENAI_MODEL gpt-5.4)"/>
     <arg name="base_url" default="$(optenv OPENAI_BASE_URL https://sub2api.luciferai.cc)"/>
     <arg name="api_enabled" default="true"/>

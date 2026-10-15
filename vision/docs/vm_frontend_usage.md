@@ -14,9 +14,9 @@ Linux 虚拟机负责打开前端页面
 source /opt/ros/melodic/setup.bash
 source /home/clbrobot/catkin_ws/devel/setup.bash
 
-ROS_MASTER_URI=http://192.168.79.91:11311 \
-ROS_IP=192.168.79.91 \
-ROS_HOSTNAME=192.168.79.91 \
+ROS_MASTER_URI=http://192.168.210.91:11311 \
+ROS_IP=192.168.210.91 \
+ROS_HOSTNAME=192.168.210.91 \
 roslaunch clbrobot astra_laser.launch
 ```
 
@@ -32,9 +32,9 @@ Device "2bc5/0402@1/8" found.
 source /opt/ros/melodic/setup.bash
 source /home/clbrobot/catkin_ws/devel/setup.bash
 
-ROS_MASTER_URI=http://192.168.79.91:11311 \
-ROS_IP=192.168.79.91 \
-ROS_HOSTNAME=192.168.79.91 \
+ROS_MASTER_URI=http://192.168.210.91:11311 \
+ROS_IP=192.168.210.91 \
+ROS_HOSTNAME=192.168.210.91 \
 rosrun web_video_server web_video_server _port:=8080
 ```
 
@@ -92,7 +92,7 @@ curl http://127.0.0.1:8090/vision/decision-input
 ssh \
   -L 8090:127.0.0.1:8090 \
   -L 8080:127.0.0.1:8080 \
-  clbrobot@192.168.79.91
+  clbrobot@192.168.210.91
 ```
 
 这个终端保持不要关。转发成功后，虚拟机访问：
@@ -140,13 +140,13 @@ http://127.0.0.1:8080/stream?topic=/camera/rgb/image_raw
 如果不使用 SSH 端口转发，也可以把页面里的 API 地址改成：
 
 ```text
-http://192.168.79.91:8090
+http://192.168.210.91:8090
 ```
 
 同时把页面里的视频流地址改成：
 
 ```text
-http://192.168.79.91:8080/stream?topic=/camera/rgb/image_raw
+http://192.168.210.91:8080/stream?topic=/camera/rgb/image_raw
 ```
 
 ## 前端文件位置

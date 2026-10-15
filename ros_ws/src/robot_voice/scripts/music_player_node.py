@@ -23,7 +23,7 @@ class MusicPlayerNode:
             rospy.get_param("~music_dir", "~/Music/robot_music")
         )
         self.jetson_user = rospy.get_param("~jetson_user", "clbrobot")
-        self.jetson_host = rospy.get_param("~jetson_host", "192.168.64.91")
+        self.jetson_host = rospy.get_param("~jetson_host", "192.168.210.91")
         self.audio_device = rospy.get_param("~audio_device", "plughw:2,0")
         self.ssh_connect_timeout = int(rospy.get_param("~ssh_connect_timeout", 5))
         self.confirm_score = float(rospy.get_param("~confirm_score", 0.50))

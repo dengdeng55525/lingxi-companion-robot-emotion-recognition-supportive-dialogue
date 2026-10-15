@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>灵犀家长端陪护仪表盘</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --text: #1f2933;
+      --muted: #687382;
+      --border: #dce2ea;
+      --green: #2f9e44;
+      --blue: #1971c2;
+      --yellow: #f08c00;
+      --red: #c92a2a;
+      --violet: #7048e8;
+      --teal: #0c8599;
+      --shadow: 0 8px 20px rgba(31, 41, 51, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    .app {
+      width: min(1440px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 22px 0 32px;
+    }
+
+    header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 26px;
+      line-height: 1.2;
+    }
+
+    .subtitle {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 210px;
+      justify-content: flex-end;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 0 0 4px rgba(201, 42, 42, 0.12);
+    }
+
+    .dot.ok {
+      background: var(--green);
+      box-shadow: 0 0 0 4px rgba(47, 158, 68, 0.12);
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) 124px 44px;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    input,
+    button {
+      height: 40px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+      font: inherit;
+    }
+
+    input {
+      padding: 0 12px;
+    }
+
+    button {
+      cursor: pointer;
+      font-weight: 650;
+    }
+
+    button.primary {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #fff;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .metric {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      box-shadow: var(--shadow);
+      min-height: 88px;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 26px;
+      line-height: 1.1;
+      word-break: break-word;
+    }
+
+    .metric.danger strong {
+      color: var(--red);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(340px, 0.9fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 13px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .panel-body {
+      padding: 14px;
+    }
+
+    .trend {
+      font-size: 15px;
+      line-height: 1.7;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 320px;
+      min-height: 320px;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+    }
+
+    .objects,
+    .danger-objects {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .object-chip,
+    .danger-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 34px;
+      padding: 6px 9px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #f8fafc;
+      font-size: 14px;
+    }
+
+    .object-chip strong,
+    .danger-chip strong {
+      font-size: 14px;
+    }
+
+    .danger-chip {
+      border-color: #ffc9c9;
+      background: #fff5f5;
+      color: var(--red);
+      font-weight: 700;
+    }
+
+    .danger-chip .muted {
+      color: #e03131;
+      font-weight: 600;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 10px;
+      max-height: 560px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .message {
+      display: grid;
+      grid-template-columns: 54px minmax(0, 1fr);
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .message.active {
+      border-color: var(--blue);
+      background: #eef6ff;
+    }
+
+    .role {
+      font-weight: 700;
+      color: var(--blue);
+    }
+
+    .role.robot {
+      color: var(--teal);
+    }
+
+    .message p {
+      margin: 4px 0 0;
+      line-height: 1.55;
+      word-break: break-word;
+    }
+
+    .empty {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: #edf2ff;
+      color: #364fc7;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .badge.mock {
+      background: #fff4e6;
+      color: #d9480f;
+    }
+
+    @media (max-width: 960px) {
+      .layout,
+      .summary-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .layout {
+        display: block;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .app {
+        width: min(100vw - 20px, 1440px);
+        padding-top: 14px;
+      }
+
+      header,
+      .status {
+        display: block;
+      }
+
+      .controls,
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .chart-wrap {
+        height: 260px;
+        min-height: 260px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <h1>灵犀家长端陪护仪表盘</h1>
+        <p class="subtitle">情绪趋势、对话记录与今日学习概念</p>
+      </div>
+      <div class="status">
+        <span id="statusDot" class="dot"></span>
+        <div>
+          <strong id="statusText">未连接</strong>
+          <div id="lastUpdate" class="muted">等待数据</div>
+        </div>
+      </div>
+    </header>
+
+    <section class="controls">
+      <input id="apiBase" value="http://127.0.0.1:8091" aria-label="Parent dashboard API">
+      <button id="refreshBtn" class="primary">刷新</button>
+      <button id="pauseBtn" title="暂停或继续">||</button>
+    </section>
+
+    <section class="summary-grid">
+      <div class="metric"><span>当前情绪</span><strong id="currentEmotion">--</strong></div>
+      <div class="metric"><span>今日记录点</span><strong id="sampleCount">--</strong></div>
+      <div class="metric"><span>对话条数</span><strong id="dialogueCount">--</strong></div>
+      <div class="metric"><span>学习概念</span><strong id="objectCount">--</strong></div>
+      <div class="metric danger"><span>危险物品</span><strong id="dangerCount">--</strong></div>
+    </section>
+
+    <section class="layout">
+      <div>
+        <section class="panel">
+          <div class="panel-title">
+            <h2>今日情绪曲线</h2>
+            <span id="mockBadge" class="badge mock" hidden>演示数据</span>
+          </div>
+          <div class="panel-body">
+            <div class="chart-wrap">
+              <canvas id="emotionChart"></canvas>
+            </div>
+            <div id="legend" class="legend"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-title">
+            <h2>最近情绪趋势</h2>
+          </div>
+          <div class="panel-body">
+            <div id="trendText" class="trend">等待今日记录。</div>
+          </div>
+        </section>
+      </div>
+
+      <div>
+        <section class="panel">
+          <div class="panel-title">
+            <h2>今日学习概念</h2>
+          </div>
+          <div class="panel-body">
+            <div id="objects" class="objects"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-title">
+            <h2>危险物品</h2>
+          </div>
+          <div class="panel-body">
+            <div id="dangerousObjects" class="danger-objects"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-title">
+            <h2>聊天记录</h2>
+            <span id="dateBadge" class="badge">--</span>
+          </div>
+          <div class="panel-body">
+            <div id="timeline" class="timeline"></div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const state = {
+      payload: null,
+      paused: false,
+      timer: null,
+      points: [],
+    };
+
+    const emotionMeta = {
+      happy: { label: "开心", level: 5, color: "#2f9e44" },
+      surprise: { label: "惊讶", level: 4, color: "#f08c00" },
+      neutral: { label: "平静", level: 3, color: "#1971c2" },
+      sad: { label: "低落", level: 2, color: "#7048e8" },
+      fear: { label: "紧张", level: 2, color: "#0c8599" },
+      angry: { label: "生气", level: 1, color: "#c92a2a" },
+      disgust: { label: "抗拒", level: 1, color: "#8d4b20" },
+      unknown: { label: "未知", level: 0, color: "#868e96" },
+    };
+
+    const el = (id) => document.getElementById(id);
+    const pct = (value) => `${Math.round(Number(value || 0) * 100)}%`;
+
+    function currentHost() {
+      return window.location.hostname || "127.0.0.1";
+    }
+
+    function defaultApiBase() {
+      return `${window.location.protocol}//${currentHost()}:8091`;
+    }
+
+    function initApiBase() {
+      if (el("apiBase").value === "http://127.0.0.1:8091") {
+        el("apiBase").value = defaultApiBase();
+      }
+    }
+
+    function apiBase() {
+      return el("apiBase").value.replace(/\/+$/, "");
+    }
+
+    function setStatus(ok, text, detail) {
+      el("statusDot").classList.toggle("ok", ok);
+      el("statusText").textContent = text;
+      el("lastUpdate").textContent = detail || "";
+    }
+
+    async function fetchToday() {
+      const response = await fetch(`${apiBase()}/parent/today`, { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    }
+
+    function render(payload) {
+      state.payload = payload;
+      const summary = payload.summary || {};
+      const current = summary.current_emotion || "unknown";
+      const meta = emotionMeta[current] || emotionMeta.unknown;
+
+      el("currentEmotion").textContent = `${summary.current_emotion_label || meta.label} ${pct(summary.current_confidence)}`;
+      el("sampleCount").textContent = summary.sample_count ?? 0;
+      el("dialogueCount").textContent = summary.dialogue_count ?? 0;
+      el("objectCount").textContent = summary.learned_object_count ?? 0;
+      el("dangerCount").textContent = summary.dangerous_object_count ?? 0;
+      el("trendText").textContent = summary.trend_text || "今天还没有形成足够的情绪记录。";
+      el("dateBadge").textContent = payload.date || "--";
+      el("mockBadge").hidden = !payload.mock;
+
+      renderChart(payload.emotions || []);
+      renderLegend();
+      renderObjects(payload.objects || []);
+      renderDangerousObjects(payload.dangerous_objects || []);
+      renderDialogue(payload.dialogue || []);
+      setStatus(true, payload.mock ? "演示数据" : "已连接", new Date().toLocaleTimeString());
+    }
+
+    function renderLegend() {
+      const labels = ["happy", "neutral", "surprise", "sad", "fear", "angry", "disgust", "unknown"];
+      el("legend").innerHTML = labels.map((key) => {
+        const item = emotionMeta[key];
+        return `<span class="legend-item"><span class="swatch" style="background:${item.color}"></span>${item.label}</span>`;
+      }).join("");
+    }
+
+    function chartMetrics(canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return { ctx, width: rect.width, height: rect.height, pad: { left: 48, right: 18, top: 18, bottom: 34 } };
+    }
+
+    function renderChart(samples) {
+      const canvas = el("emotionChart");
+      const { ctx, width, height, pad } = chartMetrics(canvas);
+      ctx.clearRect(0, 0, width, height);
+      ctx.font = "12px system-ui, sans-serif";
+      ctx.lineWidth = 1;
+      state.points = [];
+
+      const chartW = width - pad.left - pad.right;
+      const chartH = height - pad.top - pad.bottom;
+      const levels = [5, 4, 3, 2, 1, 0];
+      const levelLabels = { 5: "开心", 4: "惊讶", 3: "平静", 2: "低落/紧张", 1: "生气/抗拒", 0: "未知" };
+
+      ctx.strokeStyle = "#dce2ea";
+      ctx.fillStyle = "#687382";
+      levels.forEach((level) => {
+        const y = pad.top + chartH - (level / 5) * chartH;
+        ctx.beginPath();
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(width - pad.right, y);
+        ctx.stroke();
+        ctx.fillText(levelLabels[level], 8, y + 4);
+      });
+
+      if (!samples.length) {
+        ctx.fillStyle = "#687382";
+        ctx.fillText("暂无今日记录", pad.left + 10, pad.top + 24);
+        return;
+      }
+
+      const times = samples.map((item) => Number(item.timestamp || 0));
+      const minT = Math.min(...times);
+      const maxT = Math.max(...times);
+      const span = Math.max(1, maxT - minT);
+
+      function pointFor(sample) {
+        const emotion = sample.emotion || "unknown";
+        const meta = emotionMeta[emotion] || emotionMeta.unknown;
+        const x = pad.left + ((Number(sample.timestamp || minT) - minT) / span) * chartW;
+        const y = pad.top + chartH - (meta.level / 5) * chartH;
+        return { x, y, emotion, meta, sample };
+      }
+
+      const points = samples.map(pointFor);
+      state.points = points;
+
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#adb5bd";
+      ctx.beginPath();
+      points.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      });
+      ctx.stroke();
+
+      points.forEach((point) => {
+        ctx.beginPath();
+        ctx.fillStyle = point.meta.color;
+        ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      ctx.fillStyle = "#687382";
+      ctx.fillText(samples[0].time_label || "", pad.left, height - 10);
+      ctx.textAlign = "right";
+      ctx.fillText(samples[samples.length - 1].time_label || "", width - pad.right, height - 10);
+      ctx.textAlign = "left";
+    }
+
+    function renderObjects(objects) {
+      if (!objects.length) {
+        el("objects").innerHTML = `<p class="empty">今天还没有稳定识别到学习概念。</p>`;
+        return;
+      }
+      el("objects").innerHTML = objects.map((item) => `
+        <span class="object-chip">
+          <strong>${escapeHtml(item.class_name)}</strong>
+          <span class="muted">${item.first_seen_label || "--"} · ${item.count || 1}次 · ${pct(item.max_confidence)}</span>
+        </span>
+      `).join("");
+    }
+
+    function renderDangerousObjects(objects) {
+      if (!objects.length) {
+        el("dangerousObjects").innerHTML = `<p class="empty">今天还没有检测到危险物品。</p>`;
+        return;
+      }
+      el("dangerousObjects").innerHTML = objects.map((item) => `
+        <span class="danger-chip">
+          <strong>${escapeHtml(item.display_name || item.class_name)}</strong>
+          <span class="muted">${escapeHtml(item.class_name || "")} · ${item.last_seen_label || "--"} · ${item.count || 1}次 · ${pct(item.max_confidence)}</span>
+        </span>
+      `).join("");
+    }
+
+    function renderDialogue(dialogue) {
+      if (!dialogue.length) {
+        el("timeline").innerHTML = `<p class="empty">今天还没有聊天记录。</p>`;
+        return;
+      }
+      el("timeline").innerHTML = dialogue.map((item, index) => {
+        const isRobot = item.role === "robot";
+        return `
+          <div class="message" data-index="${index}" data-ts="${Number(item.timestamp || 0)}">
+            <div class="muted">${item.time_label || "--"}</div>
+            <div>
+              <span class="role ${isRobot ? "robot" : ""}">${isRobot ? "灵犀" : "孩子"}</span>
+              <p>${escapeHtml(item.text || "")}</p>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "\"": "&quot;",
+        "'": "&#39;",
+      }[char]));
+    }
+
+    function scrollDialogueToTime(timestamp) {
+      const messages = Array.from(document.querySelectorAll(".message[data-ts]"));
+      if (!messages.length) return;
+      let best = messages[0];
+      let bestDelta = Math.abs(Number(best.dataset.ts) - timestamp);
+      messages.forEach((node) => {
+        const delta = Math.abs(Number(node.dataset.ts) - timestamp);
+        if (delta < bestDelta) {
+          best = node;
+          bestDelta = delta;
+        }
+      });
+      messages.forEach((node) => node.classList.remove("active"));
+      best.classList.add("active");
+      best.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+
+    function onChartClick(event) {
+      if (!state.points.length) return;
+      const rect = el("emotionChart").getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      let best = state.points[0];
+      let bestDist = Number.POSITIVE_INFINITY;
+      state.points.forEach((point) => {
+        const dist = Math.hypot(point.x - x, point.y - y);
+        if (dist < bestDist) {
+          best = point;
+          bestDist = dist;
+        }
+      });
+      if (best && best.sample) {
+        scrollDialogueToTime(Number(best.sample.timestamp || 0));
+      }
+    }
+
+    async function refresh() {
+      if (state.paused) return;
+      try {
+        render(await fetchToday());
+      } catch (error) {
+        setStatus(false, "连接失败", error.message);
+      }
+    }
+
+    initApiBase();
+    el("refreshBtn").addEventListener("click", refresh);
+    el("pauseBtn").addEventListener("click", () => {
+      state.paused = !state.paused;
+      el("pauseBtn").textContent = state.paused ? ">" : "||";
+      if (!state.paused) refresh();
+    });
+    el("emotionChart").addEventListener("click", onChartClick);
+    window.addEventListener("resize", () => {
+      if (state.payload) renderChart(state.payload.emotions || []);
+    });
+
+    refresh();
+    state.timer = setInterval(refresh, 5000);
+  </script>
+</body>
+</html>

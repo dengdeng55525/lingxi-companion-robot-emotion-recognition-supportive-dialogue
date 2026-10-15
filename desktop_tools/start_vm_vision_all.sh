@@ -2,8 +2,16 @@
 set -euo pipefail
 
 PROJECT_DIR="${PROJECT_DIR:-$HOME/yolov5_emotieff_vgaf_windows}"
-ROBOT_IP="${ROBOT_IP:-192.168.64.91}"
-VM_IP="${VM_IP:-$(hostname -I | awk '{print $1}')}"
+ROBOT_IP="${ROBOT_IP:-192.168.210.91}"
+
+detect_vm_ip() {
+  local detected=""
+  detected="$(ip -4 route get "${ROBOT_IP}" 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="src") {print $(i+1); exit}}' || true)"
+  printf '%s\n' "${detected}"
+}
+
+VM_IP="${VM_IP:-$(detect_vm_ip)}"
+VM_IP="${VM_IP:-192.168.210.231}"
 
 cd "${PROJECT_DIR}"
 

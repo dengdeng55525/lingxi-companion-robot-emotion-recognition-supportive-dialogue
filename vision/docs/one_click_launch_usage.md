@@ -11,7 +11,7 @@
 
 ```bash
 scp /home/lzc/桌面/start_jetson_vision_stack.sh \
-  clbrobot@192.168.79.91:/home/clbrobot/catkin_ws/yolov5_emotieff_vgaf_jetson/scripts/start_jetson_vision_stack.sh
+  clbrobot@192.168.210.91:/home/clbrobot/catkin_ws/yolov5_emotieff_vgaf_jetson/scripts/start_jetson_vision_stack.sh
 ```
 
 在小车上加执行权限：

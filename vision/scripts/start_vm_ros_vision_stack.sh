@@ -6,8 +6,16 @@ PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
 ROS_SETUP="${ROS_SETUP:-/opt/ros/noetic/setup.bash}"
 CATKIN_SETUP="${CATKIN_SETUP:-}"
 
-ROBOT_IP="${ROBOT_IP:-192.168.79.91}"
-VM_IP="${VM_IP:-192.168.79.199}"
+ROBOT_IP="${ROBOT_IP:-192.168.210.91}"
+
+detect_vm_ip() {
+  local detected=""
+  detected="$(ip -4 route get "${ROBOT_IP}" 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="src") {print $(i+1); exit}}' || true)"
+  printf '%s\n' "${detected}"
+}
+
+VM_IP="${VM_IP:-$(detect_vm_ip)}"
+VM_IP="${VM_IP:-192.168.210.231}"
 ROS_IMAGE_TOPIC="${ROS_IMAGE_TOPIC:-/camera/rgb/image_raw}"
 ROS_IMAGE_FALLBACK_TOPIC="${ROS_IMAGE_FALLBACK_TOPIC:-/camera/rgb/image_rect_color}"
 ENABLE_IMAGE_TOPIC_RELAY="${ENABLE_IMAGE_TOPIC_RELAY:-1}"

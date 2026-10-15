@@ -5,7 +5,7 @@ set -u
 PROJECT_DIR="${PROJECT_DIR:-/home/clbrobot/catkin_ws/yolov5_emotieff_vgaf_jetson}"
 ROS_SETUP="${ROS_SETUP:-/opt/ros/melodic/setup.bash}"
 CATKIN_SETUP="${CATKIN_SETUP:-/home/clbrobot/catkin_ws/devel/setup.bash}"
-ROBOT_IP="${ROBOT_IP:-192.168.64.91}"
+ROBOT_IP="${ROBOT_IP:-192.168.210.91}"
 
 VIDEO_PORT="${VIDEO_PORT:-8080}"
 API_PORT="${API_PORT:-8090}"

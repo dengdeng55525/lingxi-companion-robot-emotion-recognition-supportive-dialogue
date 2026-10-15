@@ -1,6 +1,6 @@
 <launch>
     <arg name="jetson_user" default="clbrobot"/>
-    <arg name="jetson_host" default="192.168.64.91"/>
+    <arg name="jetson_host" default="192.168.210.91"/>
     <arg name="input_topic" default="iat_text"/>
     <arg name="linear_speed" default="0.15"/>
     <arg name="angular_speed" default="0.45"/>

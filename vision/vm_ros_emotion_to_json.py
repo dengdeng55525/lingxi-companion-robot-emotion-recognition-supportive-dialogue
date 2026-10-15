@@ -55,7 +55,7 @@ def parse_args():
         description="Read a ROS Image topic in a Linux VM, run YOLO5Face + EmotiEffLib, and keep a JSON result file updated."
     )
     parser.add_argument("--ros-image-topic", type=str, default="/camera/rgb/image_raw")
-    parser.add_argument("--ros-master-uri", type=str, default="", help="Optional ROS_MASTER_URI override, e.g. http://192.168.79.91:11311.")
+    parser.add_argument("--ros-master-uri", type=str, default="", help="Optional ROS_MASTER_URI override, e.g. http://192.168.210.91:11311.")
     parser.add_argument("--ros-ip", type=str, default="", help="Optional ROS_IP override for this VM.")
     parser.add_argument("--ros-hostname", type=str, default="", help="Optional ROS_HOSTNAME override for this VM.")
     parser.add_argument("--face-weights", type=str, default="yolov5-face/weights/yolov5s-face.pt")

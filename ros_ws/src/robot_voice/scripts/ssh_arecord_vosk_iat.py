@@ -26,7 +26,7 @@ def _load_vosk():
 class SshArecordVoskIat:
     def __init__(self):
         self.jetson_user = rospy.get_param("~jetson_user", "clbrobot")
-        self.jetson_host = rospy.get_param("~jetson_host", "192.168.64.91")
+        self.jetson_host = rospy.get_param("~jetson_host", "192.168.210.91")
         self.audio_device = rospy.get_param("~audio_device", "")
         self.model_path = rospy.get_param("~model_path", "")
         self.sample_rate = int(rospy.get_param("~sample_rate", 16000))

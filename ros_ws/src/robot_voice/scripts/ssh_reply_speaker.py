@@ -16,7 +16,7 @@ class SshReplySpeaker:
         self.reply_topic = rospy.get_param("~reply_topic", "ai_reply")
         self.global_stop_topic = rospy.get_param("~global_stop_topic", "robot_stop_all")
         self.jetson_user = rospy.get_param("~jetson_user", "clbrobot")
-        self.jetson_host = rospy.get_param("~jetson_host", "192.168.64.91")
+        self.jetson_host = rospy.get_param("~jetson_host", "192.168.210.91")
         self.ssh_connect_timeout = int(rospy.get_param("~ssh_connect_timeout", 5))
         self.command_timeout = float(rospy.get_param("~command_timeout", 45.0))
         self.backend = rospy.get_param("~backend", "auto")

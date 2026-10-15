@@ -1,6 +1,6 @@
 # RoboEyes 启动与排障手册（VM + Jetson）
 
-> 目标：实现 **AutoDL 同时识别摄像头前的人脸情绪和物体**，情绪同步到 RoboEyes，物体/情绪交给 AI 推理模型，并且在 HTML 里看到视频流。
+> 目标：实现 **AutoDL 同时识别摄像头前的人脸情绪和物体**，情绪同步到 RoboEyes，物体/情绪交给 AI 推理模型，并且在 HTML 里看到视频流和家长端陪护记录。
 
 ---
 
@@ -35,49 +35,64 @@ RoboEyes 不是“嘴巴笑脸”，它主要是眼睑和眼形变化。
   - `~/yolov5_emotieff_vgaf_windows/outputs/latest_emotion.json`：完整视觉 JSON，包含 `faces`、`objects` 和 AutoDL 原始返回。
   - `~/.ros/latest_emotion.json`：AI/RoboEyes 读取的轻量 JSON，包含情绪字段和 `objects`。
 - AI 推理/语音节点继续读取 `emotion_file=$HOME/.ros/latest_emotion.json`，不用改 ROS 工作空间。
+- AI 推理/语音节点会从视觉 `objects` 中检查危险物品；检测到刀具、剪刀、叉子、球棒、锤子等类别时，会通过 `ai_reply` 语音提醒小朋友放下并远离，同一类别默认 20 秒内不重复提醒。
+- 家长端页面额外记录：
+  - 情绪历史：由 `parent_dashboard_api.py` 定时采样 `http://127.0.0.1:8090/vision/latest`，写入 `outputs/parent_dashboard.sqlite3`。
+  - 对话日志：由 `parent_dialogue_logger.py` 订阅 `/iat_text` 和 `/ai_reply`，写入 `~/.ros/ai_companion_dialogue.jsonl`。
+  - 学习概念：只有孩子主动问“这是什么/眼前是什么/我想知道这个”等求知问题，并且 DeepSeek 判定为 `object_learning_query`、视觉里有 `objects` 时，才写入 `~/.ros/ai_learning_events.jsonl` 并计入学习成果。
+  - 危险物品：由 `parent_dashboard_api.py` 从视觉 `objects` 中聚合，显示在家长端“危险物品”栏目，红色字体提示。
+  - 前端页面：`http://127.0.0.1:9000/parent_dashboard.html`。
 
-> 注意：GitHub 备份版已脱敏；真实服务器密码和 Token 请只保存在本机私有手册或环境变量中。
+> 注意：下面包含服务器密码，属于明文凭据。这个文档不要外传。
 
 AutoDL/SeetaCloud 信息：
 
 ```text
-SSH：ssh -p 11189 <SEETACLOUD_SSH_USER_AND_HOST>
-SSH 密码：<SEETACLOUD_SSH_PASSWORD>
+SSH：ssh -p 39265 root@connect.westc.seetacloud.com
+SSH 密码：Q5bxq/zl7UA9
 本地映射地址：http://127.0.0.1:6008
-视频流 Token：<ROBOTVISION_STREAM_TOKEN>
+视频流 Token：11111111
 ```
 
 SSH 说明：
 
-- 从 VM 登录小车已经配置过免密：`ssh clbrobot@192.168.64.91`
+- 从 VM 登录小车已经配置过免密：`ssh clbrobot@192.168.210.91`
 - 小车自己 SSH 到自己也已配置免密。
-- 如果终端提示符已经是 `clbrobot@robot:~$`，说明你已经在小车里了，不需要再执行 `ssh clbrobot@192.168.64.91`，直接执行后面的 `source ...` 和 `roslaunch ...` 即可。
+- 如果终端提示符已经显示当前用户是 `clbrobot`，说明你已经在小车里了，不需要再执行 `ssh clbrobot@192.168.210.91`，直接执行后面的 `source ...` 和 `roslaunch ...` 即可。
 
-下面 `终端1` 到 `终端10` 是当前 AutoDL 方案的主启动流程，前面的每个终端都需要开。旧的 VM 本地 YOLO/情绪识别方案已经移到后面的“备用方案”章节，不要和 `终端5` 同时启动。
+当前 ROS 网络地址：
+
+- 小车 Jetson：`192.168.210.91`
+- VM 连接小车的网卡：`ens37 = 192.168.210.231`
+- VM 还有一块 `ens33 = 192.168.170.128`，这个地址不和小车在同一网段，不要用于 VM 侧 `ROS_IP` / `ROS_HOSTNAME`。
+
+下面 `终端1` 到 `终端10` 是当前 AutoDL 方案的主启动流程，前面的每个终端都需要开。
+如果要打开家长端陪护仪表盘，再额外启动 `终端7A` 和 `终端9A`。
+旧的 VM 本地 YOLO/情绪识别方案已经移到后面的“备用方案”章节，不要和 `终端5` 同时启动。
 
 ### 终端1（Jetson 底盘）
 
 > 职责：只启动底盘。你已经确认手动 `bringup` 能带动底盘，所以这里以这个为准。
 
 ```bash
-ssh clbrobot@192.168.64.91
+ssh clbrobot@192.168.210.91
 source /opt/ros/melodic/setup.bash
 source ~/catkin_ws/devel/setup.bash
-export ROS_MASTER_URI=http://192.168.64.91:11311
-export ROS_IP=192.168.64.91
-export ROS_HOSTNAME=192.168.64.91
+export ROS_MASTER_URI=http://192.168.210.91:11311
+export ROS_IP=192.168.210.91
+export ROS_HOSTNAME=192.168.210.91
 roslaunch clbrobot bringup.launch
 ```
 
 这个终端不要关。另开一个 Jetson 终端检查：
 
 ```bash
-ssh clbrobot@192.168.64.91
+ssh clbrobot@192.168.210.91
 source /opt/ros/melodic/setup.bash
 source ~/catkin_ws/devel/setup.bash
-export ROS_MASTER_URI=http://192.168.64.91:11311
-export ROS_IP=192.168.64.91
-export ROS_HOSTNAME=192.168.64.91
+export ROS_MASTER_URI=http://192.168.210.91:11311
+export ROS_IP=192.168.210.91
+export ROS_HOSTNAME=192.168.210.91
 rostopic info /cmd_vel
 ```
 
@@ -88,24 +103,24 @@ rostopic info /cmd_vel
 > 职责：只启动 ASTRA 相机。
 
 ```bash
-ssh clbrobot@192.168.64.91
+ssh clbrobot@192.168.210.91
 source /opt/ros/melodic/setup.bash
 source ~/catkin_ws/devel/setup.bash
-export ROS_MASTER_URI=http://192.168.64.91:11311
-export ROS_IP=192.168.64.91
-export ROS_HOSTNAME=192.168.64.91
+export ROS_MASTER_URI=http://192.168.210.91:11311
+export ROS_IP=192.168.210.91
+export ROS_HOSTNAME=192.168.210.91
 roslaunch clbrobot astra_laser.launch
 ```
 
 这个终端也不要关。另开一个 Jetson 终端检查相机话题：
 
 ```bash
-ssh clbrobot@192.168.64.91
+ssh clbrobot@192.168.210.91
 source /opt/ros/melodic/setup.bash
 source ~/catkin_ws/devel/setup.bash
-export ROS_MASTER_URI=http://192.168.64.91:11311
-export ROS_IP=192.168.64.91
-export ROS_HOSTNAME=192.168.64.91
+export ROS_MASTER_URI=http://192.168.210.91:11311
+export ROS_IP=192.168.210.91
+export ROS_HOSTNAME=192.168.210.91
 rostopic list | grep -E "/camera/rgb/image_raw|/camera/rgb/image_rect_color"
 rostopic hz /camera/rgb/image_raw
 ```
@@ -115,8 +130,8 @@ rostopic hz /camera/rgb/image_raw
 ```bash
 source /opt/ros/noetic/setup.bash
 source ~/catkin_ws/devel/setup.bash
-export ROS_MASTER_URI=http://192.168.64.91:11311
-export VM_IP=$(hostname -I | awk '{print $1}')
+export ROS_MASTER_URI=http://192.168.210.91:11311
+export VM_IP=192.168.210.231
 export ROS_IP=$VM_IP
 export ROS_HOSTNAME=$VM_IP
 rostopic list | grep -E "/camera/rgb/image_raw|/camera/rgb/image_rect_color"
@@ -132,8 +147,8 @@ rostopic hz /camera/rgb/image_raw
 ```bash
 source /opt/ros/noetic/setup.bash
 source ~/catkin_ws/devel/setup.bash
-export ROS_MASTER_URI=http://192.168.64.91:11311
-export VM_IP=$(hostname -I | awk '{print $1}')
+export ROS_MASTER_URI=http://192.168.210.91:11311
+export VM_IP=192.168.210.231
 export ROS_IP=$VM_IP
 export ROS_HOSTNAME=$VM_IP
 rosrun web_video_server web_video_server _port:=8080
@@ -156,14 +171,14 @@ http://127.0.0.1:8080/stream?topic=/camera/rgb/image_raw
 ```bash
 ssh -N \
   -L 6008:127.0.0.1:6008 \
-  -p 11189 \
-  <SEETACLOUD_SSH_USER_AND_HOST>
+  -p 39265 \
+  root@connect.westc.seetacloud.com
 ```
 
 出现下面提示时输入密码：
 
 ```text
-<SEETACLOUD_SSH_PASSWORD>
+Q5bxq/zl7UA9
 ```
 
 第一次连接如果提示：
@@ -182,7 +197,7 @@ yes
 
 ```bash
 curl --noproxy '*' http://127.0.0.1:6008/api/latest-result \
-  -H "X-Stream-Token: <ROBOTVISION_STREAM_TOKEN>"
+  -H "X-Stream-Token: 11111111"
 ```
 
 正常情况会返回 JSON，例如 `status` 为 `waiting`、`ok` 等。只要不是下面两种就说明隧道和 Token 正常：
@@ -204,7 +219,7 @@ Invalid stream token
 
 ```bash
 cd ~/yolov5_emotieff_vgaf_windows
-export ROBOTVISION_STREAM_TOKEN=<ROBOTVISION_STREAM_TOKEN>
+export ROBOTVISION_STREAM_TOKEN=11111111
 
 python3 send_webcam_http.py \
   --server-url http://127.0.0.1:6008 \
@@ -263,9 +278,9 @@ curl http://127.0.0.1:8090/health
 curl http://127.0.0.1:8090/vision/latest
 ```
 
-### 终端7（VM Dashboard）
+### 终端7（VM Dashboard + 家长端前端页面）
 
-> 职责：只打开 HTML 页面服务。
+> 职责：只打开 HTML 页面服务。这个终端同时服务实时视觉 Dashboard 和家长端页面。
 
 ```bash
 cd ~/yolov5_emotieff_vgaf_windows/frontend
@@ -275,8 +290,53 @@ python3 -m http.server 9000
 启动后访问：
 
 - Dashboard：`http://127.0.0.1:9000/vision_dashboard.html`
+- 家长端陪护仪表盘：`http://127.0.0.1:9000/parent_dashboard.html`
 - 视频流直链：`http://127.0.0.1:8080/stream?topic=/camera/rgb/image_raw`
 - 视觉 API：`http://127.0.0.1:8090/vision/latest`
+
+### 终端7A（VM 家长端记录 API，推荐开）
+
+> 职责：
+>
+> - 定时读取终端6提供的 `http://127.0.0.1:8090/vision/latest`
+> - 把当天情绪采样写入 `outputs/parent_dashboard.sqlite3`
+> - 从 `~/.ros/ai_learning_events.jsonl` 中提取今日学习到的概念
+> - 从视觉 `objects` 中聚合危险物品，给家长端红色栏目展示
+> - 给 `parent_dashboard.html` 提供家长端 API
+>
+> 如果终端6还没开，家长端会先显示演示数据；终端6恢复后会自动采样真实数据。
+
+```bash
+cd ~/yolov5_emotieff_vgaf_windows
+python3 parent_dashboard_api.py \
+  --vision-url http://127.0.0.1:8090/vision/latest \
+  --db outputs/parent_dashboard.sqlite3 \
+  --dialogue-log "$HOME/.ros/ai_companion_dialogue.jsonl" \
+  --learning-log "$HOME/.ros/ai_learning_events.jsonl" \
+  --host 0.0.0.0 \
+  --port 8091 \
+  --sample-interval 2.0
+```
+
+测试：
+
+```bash
+curl --noproxy '*' http://127.0.0.1:8091/health
+curl --noproxy '*' http://127.0.0.1:8091/parent/today
+```
+
+正常时 `parent/today` 会返回：
+
+```text
+summary.sample_count
+summary.current_emotion
+summary.trend_text
+summary.dangerous_object_count
+emotions
+dialogue
+objects
+dangerous_objects
+```
 
 ### 终端8（VM 输出终端，必须开）
 
@@ -289,12 +349,15 @@ python3 -m http.server 9000
 ```bash
 cd ~/catkin_ws
 source devel/setup.bash
+source ~/.ros/lingxi_ai_env.sh
 unset ROS_IP ROS_HOSTNAME
 export ROS_MASTER_URI=http://localhost:11311
 
 roslaunch robot_voice ai_companion_dialogue.launch \
   jetson_user:=clbrobot \
-  jetson_host:=192.168.64.91 \
+  jetson_host:=192.168.210.91 \
+  model:=$DEEPSEEK_MODEL \
+  base_url:=$DEEPSEEK_BASE_URL \
   enable_jetson_mic:=false \
   enable_reply_speaker:=true \
   enable_music_player:=true \
@@ -307,7 +370,10 @@ roslaunch robot_voice ai_companion_dialogue.launch \
   wake_session_enabled:=true \
   wake_words:=灵犀 \
   emotion_file:=$HOME/.ros/latest_emotion.json \
-  emotion_file_poll_seconds:=0.5
+  emotion_file_poll_seconds:=0.5 \
+  dangerous_object_alert_enabled:=true \
+  dangerous_object_alert_interval:=20.0 \
+  dangerous_object_min_confidence:=0.30
 ```
 
 如果 VM 本地没有 roscore，先另开一个 VM 终端运行：
@@ -330,6 +396,43 @@ source devel/setup.bash
 unset ROS_IP ROS_HOSTNAME
 export ROS_MASTER_URI=http://localhost:11311
 roslaunch robot_voice iat_publish.launch
+```
+
+### 终端9A（VM 家长端对话日志，推荐开）
+
+> 职责：
+>
+> - 订阅 `/iat_text`，记录孩子说的话
+> - 订阅 `/ai_reply`，记录机器人回复
+> - 写入 `~/.ros/ai_companion_dialogue.jsonl`
+> - 家长端页面会读取这份日志，显示聊天时间线
+>
+> 这个脚本只旁路记录话题，不改 AI 回复逻辑，不影响 TTS。
+
+```bash
+cd ~/catkin_ws
+source devel/setup.bash
+unset ROS_IP ROS_HOSTNAME
+export ROS_MASTER_URI=http://localhost:11311
+
+cd ~/yolov5_emotieff_vgaf_windows
+python3 parent_dialogue_logger.py \
+  --user-topic /iat_text \
+  --assistant-topic /ai_reply \
+  --log-file "$HOME/.ros/ai_companion_dialogue.jsonl"
+```
+
+检查聊天日志：
+
+```bash
+tail -f ~/.ros/ai_companion_dialogue.jsonl
+```
+
+每一行都是一条 JSON，例如：
+
+```json
+{"timestamp":1783349000.0,"iso_time":"2026-07-07T20:03:20","role":"child","text":"灵犀你好","source_topic":"/iat_text"}
+{"timestamp":1783349001.0,"iso_time":"2026-07-07T20:03:21","role":"robot","text":"你好呀，我在这里陪你。","source_topic":"/ai_reply"}
 ```
 
 ### 终端10（RoboEyes 情绪同步）
@@ -363,8 +466,8 @@ python3 /home/lzc/桌面/sync_emotion_to_jetson.py
 ```bash
 source /opt/ros/noetic/setup.bash
 source ~/catkin_ws/devel/setup.bash
-export ROS_MASTER_URI=http://192.168.64.91:11311
-export VM_IP=$(hostname -I | awk '{print $1}')
+export ROS_MASTER_URI=http://192.168.210.91:11311
+export VM_IP=192.168.210.231
 export ROS_IP=$VM_IP
 export ROS_HOSTNAME=$VM_IP
 rosnode list | grep web_video_server
@@ -377,8 +480,8 @@ rosnode list | grep web_video_server
 ```bash
 source /opt/ros/noetic/setup.bash
 source ~/catkin_ws/devel/setup.bash
-export ROS_MASTER_URI=http://192.168.64.91:11311
-export VM_IP=$(hostname -I | awk '{print $1}')
+export ROS_MASTER_URI=http://192.168.210.91:11311
+export VM_IP=192.168.210.231
 export ROS_IP=$VM_IP
 export ROS_HOSTNAME=$VM_IP
 rostopic list | grep -E "/camera/rgb/image_raw|/camera/rgb/image_rect_color"
@@ -433,15 +536,15 @@ Invalid stream token
 说明 Token 不对，当前手册使用：
 
 ```text
-<ROBOTVISION_STREAM_TOKEN>
+11111111
 ```
 
 如果后面的备用本地识别方案一直没有 `frame=...`，说明 VM 没收到 ROS 图像。回头检查：
 
 ```bash
 source /opt/ros/noetic/setup.bash
-export ROS_MASTER_URI=http://192.168.64.91:11311
-export VM_IP=$(hostname -I | awk '{print $1}')
+export ROS_MASTER_URI=http://192.168.210.91:11311
+export VM_IP=192.168.210.231
 export ROS_IP=$VM_IP
 export ROS_HOSTNAME=$VM_IP
 rostopic hz /camera/rgb/image_raw
@@ -455,7 +558,7 @@ rostopic hz /camera/rgb/image_raw
 
 ```bash
 curl --noproxy '*' http://127.0.0.1:6008/api/latest-result \
-  -H "X-Stream-Token: <ROBOTVISION_STREAM_TOKEN>"
+  -H "X-Stream-Token: 11111111"
 ```
 
 如果返回：
@@ -499,7 +602,173 @@ cat ~/.ros/latest_emotion.json
 
 ---
 
-## 2.6 如果语音控制小车不动
+## 2.6 如果家长端页面没有记录
+
+家长端页面地址：
+
+```text
+http://127.0.0.1:9000/parent_dashboard.html
+```
+
+它依赖三件事：
+
+1. 终端7：`python3 -m http.server 9000`，负责打开页面。
+2. 终端7A：`parent_dashboard_api.py`，负责情绪历史和学习概念记录。
+3. 终端9A：`parent_dialogue_logger.py`，负责聊天记录。
+
+### A. 页面打不开
+
+检查终端7是否还在运行：
+
+```bash
+curl --noproxy '*' -I http://127.0.0.1:9000/parent_dashboard.html
+```
+
+正常应返回 `200 OK`。
+
+### B. 页面打开了，但显示演示数据
+
+检查终端7A：
+
+```bash
+curl --noproxy '*' http://127.0.0.1:8091/health
+curl --noproxy '*' http://127.0.0.1:8091/parent/today
+```
+
+如果 `parent/today` 里有：
+
+```json
+"mock": true
+```
+
+说明家长端 API 正常，但还没有真实数据。通常原因是终端6没开，或者 `http://127.0.0.1:8090/vision/latest` 暂时没有返回真实视觉结果。
+
+继续检查：
+
+```bash
+curl --noproxy '*' http://127.0.0.1:8090/vision/latest
+```
+
+### C. 情绪曲线有了，但聊天记录为空
+
+检查终端9A是否运行：
+
+```bash
+tail -f ~/.ros/ai_companion_dialogue.jsonl
+```
+
+然后分别确认 ROS 话题有内容：
+
+```bash
+rostopic echo /iat_text
+rostopic echo /ai_reply
+```
+
+如果 `/iat_text` 和 `/ai_reply` 有内容，但 JSONL 没新增，说明终端9A没开或 ROS 环境变量不对。
+
+### D. 家长端数据库位置
+
+家长端情绪历史数据库：
+
+```text
+~/yolov5_emotieff_vgaf_windows/outputs/parent_dashboard.sqlite3
+```
+
+家长端聊天日志：
+
+```text
+~/.ros/ai_companion_dialogue.jsonl
+```
+
+家长端学习事件日志：
+
+```text
+~/.ros/ai_learning_events.jsonl
+```
+
+注意：视觉模型检测到物体，不会自动算“学习成果”。只有孩子主动表达求知欲，例如：
+
+```text
+灵犀，这是什么？
+灵犀，眼前这个是什么？
+灵犀，我想知道这是什么东西。
+```
+
+DeepSeek 在这一轮判断为 `object_learning_query`，并且当时视觉 JSON 里有 `objects`，才会写入学习事件并出现在“今日学习概念”里。
+
+如果只是比赛演示时网络不稳，页面会自动显示演示数据，避免空白页。
+
+注意：家长端“最近情绪趋势”只做描述性观察，例如“整体比较平稳”“情绪变化比较频繁”。不要把它当成医学判断，也不要写成心理健康评分或诊断。
+
+---
+
+## 2.7 如果终端8出现 `AI API failed`
+
+当前语言推理模型走 DeepSeek OpenAI 兼容接口。配置放在本机私有文件：
+
+```text
+~/.ros/lingxi_ai_env.sh
+```
+
+手册里不写 API key 明文。终端8启动前必须有这一行：
+
+```bash
+source ~/.ros/lingxi_ai_env.sh
+```
+
+检查配置是否生效，不要打印完整 key：
+
+```bash
+source ~/.ros/lingxi_ai_env.sh
+python3 - <<'PY'
+import os
+key = os.environ.get("DEEPSEEK_API_KEY", "")
+print("DEEPSEEK_BASE_URL =", os.environ.get("DEEPSEEK_BASE_URL"))
+print("DEEPSEEK_MODEL =", os.environ.get("DEEPSEEK_MODEL"))
+print("DEEPSEEK_API_KEY =", (key[:8] + "...") if key else "MISSING")
+PY
+```
+
+正常应看到：
+
+```text
+DEEPSEEK_BASE_URL = https://api.deepseek.com
+DEEPSEEK_MODEL = deepseek-v4-flash
+DEEPSEEK_API_KEY = sk-...
+```
+
+手动测试 DeepSeek 接口：
+
+```bash
+source ~/.ros/lingxi_ai_env.sh
+curl -sS --max-time 20 https://api.deepseek.com/chat/completions \
+  -H "Authorization: Bearer $DEEPSEEK_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"model\":\"$DEEPSEEK_MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"只返回JSON: {\\\"ok\\\": true}\"}],\"response_format\":{\"type\":\"json_object\"}}"
+```
+
+如果返回 `401` 或 `Unauthorized`，说明 key 不对或额度/权限有问题。
+
+如果返回：
+
+```text
+OpenSSL SSL_connect: SSL_ERROR_SYSCALL
+```
+
+说明 VM 到 `api.deepseek.com:443` 的 TLS/代理连接没通，优先检查代理或网络，不是 AI 节点代码本身的问题。
+
+如果修改过 key，建议同时更新：
+
+```text
+~/.bashrc
+~/.ros/lingxi_ai_env.sh
+```
+
+然后重新打开终端8，重新执行整段启动命令。
+
+---
+
+## 2.8 如果语音控制小车不动
 
 先确认 Jetson 底盘终端1仍在运行，然后按下面三步从后往前测。
 
@@ -520,9 +789,40 @@ rostopic pub -1 /ai_motion_text std_msgs/String "data: '前进0.5米'"
 如果不动，看终端8有没有：
 
 ```text
-SSH voice control ready for clbrobot@192.168.64.91 on ai_motion_text
+SSH voice control ready for clbrobot@192.168.210.91 on ai_motion_text
 Voice command '前进0.5米' -> ...
 SSH command failed ...
+```
+
+如果看到：
+
+```text
+SSH command timed out while sending '右转45度'
+```
+
+说明 AI 已经正确解析出了动作，问题在 VM 通过 SSH 连接小车执行 `/cmd_vel` 时超时。按顺序检查：
+
+```bash
+ssh -o BatchMode=yes -o ConnectTimeout=5 clbrobot@192.168.210.91 'echo ssh_ok'
+```
+
+- 如果这里也超时：小车不在当前网络、IP 又变了、小车 SSH 服务没起来，或 VM 和小车不在同一网段。
+- 如果这里返回 `ssh_ok`：SSH 基础连通，重启终端8；旧的 `ai_companion_dialogue.launch` 进程不会自动吃到新 IP。
+- 如果终端8日志里还是出现旧地址：说明你启动的是旧脚本或旧终端，先 `Ctrl+C` 停掉终端8，再按本手册终端8命令重开。
+
+必要时再检查 VM 是否能看到这个 IP：
+
+```bash
+ip route get 192.168.210.91
+ping -c 2 -W 2 192.168.210.91
+```
+
+如果 `ip route get` 显示从当前网卡发出，但 `ping` 100% 丢包、SSH 也超时，说明 `192.168.210.91` 当前没有响应。优先去小车本机确认 `ip addr` 里的实际 IP、Wi-Fi/网线连接、`sudo systemctl status ssh`。
+
+查看当前终端8实际目标地址：
+
+```bash
+tail -n 80 /tmp/ai_companion_dialogue.log | grep -E "SSH voice control ready|jetson_host|192\\.168\\."
 ```
 
 ### B. 绕开语音识别，测 `/iat_text -> AI -> /ai_motion_text`
@@ -602,7 +902,7 @@ watch -n 0.5 cat ~/.ros/latest_emotion.json
 ## 4.2 Jetson 是否收到同步文件
 
 ```bash
-ssh clbrobot@192.168.64.91 "watch -n 0.5 cat /home/clbrobot/RoboEyes/latest_emotion_vm.json"
+ssh clbrobot@192.168.210.91 "watch -n 0.5 cat /home/clbrobot/RoboEyes/latest_emotion_vm.json"
 ```
 
 要看到：内容跟 VM 侧同步，`dominant_emotion`会变化。
@@ -610,7 +910,7 @@ ssh clbrobot@192.168.64.91 "watch -n 0.5 cat /home/clbrobot/RoboEyes/latest_emot
 ## 4.3 RoboEyes 是否读取并切换 mood
 
 ```bash
-ssh clbrobot@192.168.64.91 "tail -f /home/clbrobot/RoboEyes/roboeyes_driver.log"
+ssh clbrobot@192.168.210.91 "tail -f /home/clbrobot/RoboEyes/roboeyes_driver.log"
 ```
 
 正常会出现类似：
@@ -633,7 +933,7 @@ ssh clbrobot@192.168.64.91 "tail -f /home/clbrobot/RoboEyes/roboeyes_driver.log"
 检查是否在跑：
 
 ```bash
-ssh clbrobot@192.168.64.91 "pgrep -af roboeyes_json_driver.py"
+ssh clbrobot@192.168.210.91 "pgrep -af roboeyes_json_driver.py"
 ```
 
 ---
@@ -641,7 +941,7 @@ ssh clbrobot@192.168.64.91 "pgrep -af roboeyes_json_driver.py"
 ## 6. 一键重启（RoboEyes）
 
 ```bash
-ssh clbrobot@192.168.64.91 'bash -lc "/home/clbrobot/RoboEyes/start_roboeyes.sh"'
+ssh clbrobot@192.168.210.91 'bash -lc "/home/clbrobot/RoboEyes/start_roboeyes.sh"'
 ```
 
 ---
@@ -663,8 +963,8 @@ ssh clbrobot@192.168.64.91 'bash -lc "/home/clbrobot/RoboEyes/start_roboeyes.sh"
 cd ~/yolov5_emotieff_vgaf_windows
 source /opt/ros/noetic/setup.bash
 source ~/catkin_ws/devel/setup.bash
-export ROS_MASTER_URI=http://192.168.64.91:11311
-export VM_IP=$(hostname -I | awk '{print $1}')
+export ROS_MASTER_URI=http://192.168.210.91:11311
+export VM_IP=192.168.210.231
 export ROS_IP=$VM_IP
 export ROS_HOSTNAME=$VM_IP
 
@@ -725,7 +1025,7 @@ watch -n 0.5 cat ~/.ros/latest_emotion.json
 
 ```bash
 curl --noproxy '*' http://127.0.0.1:6008/api/latest-result \
-  -H "X-Stream-Token: <ROBOTVISION_STREAM_TOKEN>"
+  -H "X-Stream-Token: 11111111"
 ```
 
 9. 终端8（VM 输出/SSH 控车）最后 50 行

@@ -6,19 +6,30 @@
 
 >作者：丁俊泽
 
-Lingxi is an emotion recognition and supportive dialogue module for companion robots. The project focuses on emotional companionship in human-robot interaction: it identifies the user's emotional state from text, combines short-term emotional memory and safety boundaries, and generates empathetic, calming, and guiding responses through a fine-tuned large language model.
+Lingxi is a full companion-robot engineering project. Beyond the emotion recognition and supportive-dialogue module, it integrates robot vision (face-emotion + object detection), voice input/output, LLM-driven companion dialogue with safe motion planning, RoboEyes expression display, and a parent-facing dashboard. This repository is the complete engineering backup of the Lingxi early-education companion robot.
 
-本仓库面向比赛展示与复现实验，包含数据构建、QLoRA 微调、DPO 偏好对齐、情绪记忆、安全边界、Web 控制台和实验报告。系统定位为陪伴机器人中的情绪支持模块，不用于医学诊断、心理治疗或药物建议。
+本仓库面向比赛展示与复现实验，包含视觉感知（人脸情绪 + 物体识别）、语音交互、LLM 对话决策、底盘控制、RoboEyes 表情、家长端仪表盘、数据构建、QLoRA 微调、DPO 偏好对齐、情绪记忆、安全边界、Web 控制台和实验报告。系统定位为早教陪护机器人整机工程，情绪支持模块不用于医学诊断、心理治疗或药物建议。
 
-## Robot Integration Backup
+## Robot Integration Overview
 
 This repository also contains a sanitized backup of the current Lingxi companion robot integration code:
 
 - `vision/`: VM-side vision bridge, AutoDL HTTP webcam uploader, dashboard API, and emotion JSON tools.
+- `vision/frontend/`: real-time vision dashboard and parent-facing dashboard HTML pages.
+- `vision/parent_dashboard_api.py`: parent dashboard API for emotion history, dialogue log, learning concepts, and dangerous-object alerts.
+- `vision/parent_dialogue_logger.py`: ROS topic logger for child/robot dialogue history.
 - `ros_ws/src/robot_voice/`: ROS voice input, AI companion dialogue, TTS, and motion-command integration.
+- `ros_ws/src/robot_voice/scripts/ai_companion_node.py`: LLM-based companion decision node with safety action whitelist.
+- `ros_ws/src/robot_voice/scripts/ssh_voice_control.py`: SSH-based chassis motion executor (`/ai_motion_text` -> `/cmd_vel`).
+- `ros_ws/src/robot_voice/scripts/ssh_arecord_vosk_iat.py`: Vosk-based offline ASR from Jetson microphone.
+- `ros_ws/src/robot_voice/scripts/ssh_reply_speaker.py`: Edge-TTS based speech output.
 - `ros_ws/src/RoboEyes/`: RoboEyes display library/source used by the robot expression stack.
 - `desktop_tools/`: launch and sync helper scripts used from the VM desktop.
+- `desktop_tools/sync_emotion_to_jetson.py`: VM -> Jetson emotion sync for RoboEyes.
 - `docs/`: runbooks and troubleshooting notes.
+- `docs/灵犀早教陪护机器人技术报告.md`: full-system technical report.
+- `docs/ROBOEYES_启动与排障手册.md`: RoboEyes launch and troubleshooting manual.
+- `docs/YOLO5Face_EmotiEffLib_表情识别操作文档.md`: vision-model operations guide.
 
 The current robot vision flow uses AutoDL/SeetaCloud for inference:
 
@@ -28,6 +39,20 @@ The current robot vision flow uses AutoDL/SeetaCloud for inference:
 4. AutoDL returns emotion and object detection JSON.
 5. The VM writes `vision/outputs/latest_emotion.json` and `$HOME/.ros/latest_emotion.json`.
 6. ROS AI dialogue reads the latest JSON for supportive replies, object questions, and RoboEyes emotion sync.
+
+The full companion loop is:
+
+```text
+Camera frames (Jetson ROS)
+  -> HTTP/MJPEG video stream (VM web_video_server)
+  -> AutoDL emotion + object inference
+  -> latest_emotion.json (full + lightweight)
+  -> vision_result_api.py (dashboard)
+  -> parent_dashboard_api.py (parent dashboard)
+  -> ai_companion_node.py (LLM decision, safety, learning events)
+  -> /ai_reply (Edge-TTS playback) + /ai_motion_text (SSH chassis control)
+  -> sync_emotion_to_jetson.py (RoboEyes expression sync)
+```
 
 This GitHub backup intentionally does not contain real SSH passwords, API keys, or stream tokens. Keep values such as `ROBOTVISION_STREAM_TOKEN`, `OPENAI_API_KEY`, and SeetaCloud/AutoDL SSH credentials in local private notes or environment variables.
 
@@ -96,9 +121,17 @@ Robot Interface Extension
 ## Directory Structure
 
 ```text
+vision/                Robot vision: frame upload, emotion/object JSON, dashboard API
+vision/frontend/       Vision dashboard + parent dashboard HTML
+vision/scripts/        Environment checks and launch helpers
+vision/tests/          Vision and dashboard tests
+ros_ws/src/robot_voice/  ROS voice/decision/motion package
+ros_ws/src/RoboEyes/     Robot expression display library
+desktop_tools/          VM-side launch and emotion-sync scripts
+docs/                  Technical report, runbooks, troubleshooting manuals
 configs/               Training and data configuration files
 scripts/               Data processing, training, evaluation, and demo scripts
-src/lingxi/            Core Python modules
+src/lingxi/            Core Python modules (dialogue support module)
 examples/              Example datasets and evaluation prompts
 reports/               Experiment reports and design documents
 data/raw/              Raw datasets
